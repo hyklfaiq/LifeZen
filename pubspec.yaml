@@ -1,8 +1,8 @@
-name: flutter_application_1
-description: "A new Flutter project."
+name: LifeZen
+description: "A simple student daily-life planner built with Flutter."
 publish_to: 'none'
 
-version: 1.0.0+1
+version: 1.0.1+2
 
 environment:
   sdk: ^3.11.5
