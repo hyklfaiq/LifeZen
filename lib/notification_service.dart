@@ -56,9 +56,9 @@ class NotificationService {
     required int id,
     required String title,
     required DateTime dateTime,
+    int reminderMinutes = 10,
   }) async {
-    // Remind user 10 minutes before the task.
-    final reminder = dateTime.subtract(const Duration(minutes: 10));
+    final reminder = dateTime.subtract(Duration(minutes: reminderMinutes));
 
     if (!reminder.isAfter(DateTime.now())) {
       return;
@@ -84,6 +84,7 @@ class NotificationService {
     required int weekday,
     required int hour,
     required int minute,
+    int reminderMinutes = 10,
   }) async {
     final now = tz.TZDateTime.now(tz.local);
 
@@ -106,7 +107,7 @@ class NotificationService {
       scheduled = scheduled.add(const Duration(days: 7));
     }
 
-    final reminder = scheduled.subtract(const Duration(minutes: 10));
+    final reminder = scheduled.subtract(Duration(minutes: reminderMinutes));
 
     // If the reminder has already passed, move it to next week.
     if (!reminder.isAfter(now)) {
@@ -124,7 +125,7 @@ class NotificationService {
         scheduled.day,
         scheduled.hour,
         scheduled.minute,
-      ).subtract(const Duration(minutes: 10)),
+      ).subtract(Duration(minutes: reminderMinutes)),
       notificationDetails: _notificationDetails,
       androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
       matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,

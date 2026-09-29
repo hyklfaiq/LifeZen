@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:lifezen_app/models/schedule_item.dart';
 
-import '../models/models.dart';
 import '../utils/app_helpers.dart';
 
 class SchedulePage extends StatefulWidget {
@@ -28,8 +28,17 @@ class SchedulePage extends StatefulWidget {
 class _SchedulePageState extends State<SchedulePage> {
   Future<void> showScheduleDialog({ScheduleItem? existing}) async {
     final titleController = TextEditingController(text: existing?.title ?? '');
-    TimeOfDay selectedTime = existing?.time ?? TimeOfDay.now();
-    List<int> selectedDays = List<int>.from(existing?.repeatDays ?? [1, 2, 3, 4, 5]);
+    TimeOfDay selectedTime =
+        existing?.time ?? const TimeOfDay(hour: 9, minute: 0);
+    TimeOfDay selectedEndTime =
+        existing?.endTime ??
+        TimeOfDay(
+          hour: (selectedTime.hour + 1) % 24,
+          minute: selectedTime.minute,
+        );
+    List<int> selectedDays = List<int>.from(
+      existing?.repeatDays ?? [1, 2, 3, 4, 5],
+    );
 
     final result = await showDialog<ScheduleItem>(
       context: context,
@@ -53,7 +62,7 @@ class _SchedulePageState extends State<SchedulePage> {
                     ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: const Icon(Icons.access_time),
-                      title: const Text('Time'),
+                      title: const Text('Start time'),
                       subtitle: Text(formatTimeOfDay(selectedTime)),
                       onTap: () async {
                         final picked = await showTimePicker(
@@ -62,7 +71,55 @@ class _SchedulePageState extends State<SchedulePage> {
                         );
 
                         if (picked != null) {
-                          setDialogState(() => selectedTime = picked);
+                          setDialogState(() {
+                            selectedTime = picked;
+                            final startMinutes =
+                                selectedTime.hour * 60 + selectedTime.minute;
+                            final endMinutes =
+                                selectedEndTime.hour * 60 +
+                                selectedEndTime.minute;
+                            if (endMinutes <= startMinutes) {
+                              selectedEndTime = TimeOfDay(
+                                hour: selectedTime.hour == 23
+                                    ? 23
+                                    : selectedTime.hour + 1,
+                                minute: selectedTime.minute,
+                              );
+                            }
+                          });
+                        }
+                      },
+                    ),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.timelapse_outlined),
+                      title: const Text('End time'),
+                      subtitle: Text(formatTimeOfDay(selectedEndTime)),
+                      onTap: () async {
+                        final picked = await showTimePicker(
+                          context: context,
+                          initialTime: selectedEndTime,
+                        );
+
+                        if (picked != null) {
+                          final startMinutes =
+                              selectedTime.hour * 60 + selectedTime.minute;
+                          final endMinutes = picked.hour * 60 + picked.minute;
+
+                          if (endMinutes <= startMinutes) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'End time must be after start time.',
+                                  ),
+                                ),
+                              );
+                            }
+                            return;
+                          }
+
+                          setDialogState(() => selectedEndTime = picked);
                         }
                       },
                     ),
@@ -108,7 +165,8 @@ class _SchedulePageState extends State<SchedulePage> {
                 ),
                 FilledButton(
                   onPressed: () {
-                    if (titleController.text.trim().isEmpty || selectedDays.isEmpty) {
+                    if (titleController.text.trim().isEmpty ||
+                        selectedDays.isEmpty) {
                       return;
                     }
 
@@ -118,6 +176,7 @@ class _SchedulePageState extends State<SchedulePage> {
                         id: existing?.id ?? 0,
                         title: titleController.text.trim(),
                         time: selectedTime,
+                        endTime: selectedEndTime,
                         repeatDays: selectedDays,
                       ),
                     );
@@ -201,11 +260,18 @@ class _SchedulePageState extends State<SchedulePage> {
   DateTime _weekStart() {
     final today = DateTime.now();
     final difference = (today.weekday - widget.firstDayOfWeek + 7) % 7;
-    return DateTime(today.year, today.month, today.day).subtract(Duration(days: difference));
+    return DateTime(
+      today.year,
+      today.month,
+      today.day,
+    ).subtract(Duration(days: difference));
   }
 
   List<int> _orderedDays() {
-    return List.generate(7, (index) => ((widget.firstDayOfWeek - 1 + index) % 7) + 1);
+    return List.generate(
+      7,
+      (index) => ((widget.firstDayOfWeek - 1 + index) % 7) + 1,
+    );
   }
 
   String _fullDayName(int weekday) {
@@ -253,7 +319,10 @@ class _SchedulePageState extends State<SchedulePage> {
               children: [
                 Text(
                   _fullDayName(weekday),
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -266,7 +335,9 @@ class _SchedulePageState extends State<SchedulePage> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Divider(color: isToday ? Theme.of(context).colorScheme.primary : null),
+                Divider(
+                  color: isToday ? Theme.of(context).colorScheme.primary : null,
+                ),
                 const SizedBox(height: 8),
                 Expanded(
                   child: items.isEmpty
@@ -277,14 +348,18 @@ class _SchedulePageState extends State<SchedulePage> {
                             child: Text(
                               'No schedule',
                               style: TextStyle(
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
                               ),
                             ),
                           ),
                         )
                       : ListView(
                           padding: EdgeInsets.zero,
-                          children: items.map((item) => _scheduleCard(item)).toList(),
+                          children: items
+                              .map((item) => _scheduleCard(item))
+                              .toList(),
                         ),
                 ),
               ],
@@ -324,9 +399,9 @@ class _SchedulePageState extends State<SchedulePage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  formatTimeOfDay(item.time),
+                  '${formatTimeOfDay(item.time)} – ${formatTimeOfDay(item.endTime)}',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 11,
                     color: Theme.of(context).colorScheme.primary,
                     fontWeight: FontWeight.bold,
                   ),
@@ -334,9 +409,12 @@ class _SchedulePageState extends State<SchedulePage> {
                 const SizedBox(height: 5),
                 Text(
                   item.title,
-                  maxLines: 3,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
                 ),
               ],
             ),
@@ -392,6 +470,28 @@ class _SchedulePageState extends State<SchedulePage> {
               ],
             ),
           ),
+          if (widget.schedule.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.swipe_left_alt_rounded,
+                    size: 16,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Swipe left to delete',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           const SizedBox(height: 12),
           Expanded(
             child: widget.schedule.isEmpty

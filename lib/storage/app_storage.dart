@@ -13,6 +13,7 @@ class AppStorage {
   static const String _scheduleKey = 'schedule';
   static const String _firstDayKey = 'first_day_of_week';
   static const String _sleepGoalKey = 'sleep_goal';
+  static const String _reminderMinutesKey = 'reminder_minutes';
 
   static Future<SharedPreferences> _prefs() async {
     return SharedPreferences.getInstance();
@@ -86,6 +87,18 @@ class AppStorage {
   static Future<int> loadSleepGoal() async {
     final prefs = await _prefs();
     return prefs.getInt(_sleepGoalKey) ?? 8;
+  }
+
+  // REMINDER LEAD TIME
+
+  static Future<void> saveReminderMinutes(int minutes) async {
+    final prefs = await _prefs();
+    await prefs.setInt(_reminderMinutesKey, minutes);
+  }
+
+  static Future<int> loadReminderMinutes() async {
+    final prefs = await _prefs();
+    return prefs.getInt(_reminderMinutesKey) ?? 10;
   }
 
   // EXPENSES

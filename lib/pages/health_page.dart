@@ -60,6 +60,27 @@ class HealthPage extends StatelessWidget {
                 ),
               ],
             ),
+            if (sleepRecords.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(
+                    Icons.swipe_left_alt_rounded,
+                    size: 16,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Swipe left to delete',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 12),
             if (sleepRecords.isEmpty) _emptyCard('No sleep records yet.'),
             ...sleepRecords.map(
