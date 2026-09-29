@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../models/models.dart';
+import '../services/imaluum/imaluum_timetable.dart';
 import '../utils/app_helpers.dart';
+import 'imaluum_import_page.dart';
 
 class SchedulePage extends StatefulWidget {
   final List<ScheduleItem> schedule;
@@ -10,6 +12,7 @@ class SchedulePage extends StatefulWidget {
   final Future<void> Function(ScheduleItem item) onAddSchedule;
   final Future<void> Function(ScheduleItem item) onUpdateSchedule;
   final Future<void> Function(int id) onDeleteSchedule;
+  final Future<int> Function(List<ImaluumMeeting> meetings) onImportImaluum;
 
   const SchedulePage({
     super.key,
@@ -19,6 +22,7 @@ class SchedulePage extends StatefulWidget {
     required this.onAddSchedule,
     required this.onUpdateSchedule,
     required this.onDeleteSchedule,
+    required this.onImportImaluum,
   });
 
   @override
@@ -26,9 +30,14 @@ class SchedulePage extends StatefulWidget {
 }
 
 class _SchedulePageState extends State<SchedulePage> {
+  Future<void> _openImaluumImport() => Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => ImaluumImportPage(onImport: widget.onImportImaluum),
+      ));
   Future<void> showScheduleDialog({ScheduleItem? existing}) async {
     final titleController = TextEditingController(text: existing?.title ?? '');
-    TimeOfDay selectedTime = existing?.time ?? TimeOfDay.now();
+    TimeOfDay selectedTime = existing?.time ?? const TimeOfDay(hour: 9, minute: 0);
+    TimeOfDay selectedEndTime = existing?.endTime ??
+        TimeOfDay(hour: (selectedTime.hour + 1) % 24, minute: selectedTime.minute);
     List<int> selectedDays = List<int>.from(existing?.repeatDays ?? [1, 2, 3, 4, 5]);
 
     final result = await showDialog<ScheduleItem>(
@@ -53,7 +62,7 @@ class _SchedulePageState extends State<SchedulePage> {
                     ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: const Icon(Icons.access_time),
-                      title: const Text('Time'),
+                      title: const Text('Start time'),
                       subtitle: Text(formatTimeOfDay(selectedTime)),
                       onTap: () async {
                         final picked = await showTimePicker(
@@ -62,7 +71,47 @@ class _SchedulePageState extends State<SchedulePage> {
                         );
 
                         if (picked != null) {
-                          setDialogState(() => selectedTime = picked);
+                          setDialogState(() {
+                            selectedTime = picked;
+                            final startMinutes = selectedTime.hour * 60 + selectedTime.minute;
+                            final endMinutes = selectedEndTime.hour * 60 + selectedEndTime.minute;
+                            if (endMinutes <= startMinutes) {
+                              selectedEndTime = TimeOfDay(
+                                hour: selectedTime.hour == 23 ? 23 : selectedTime.hour + 1,
+                                minute: selectedTime.minute,
+                              );
+                            }
+                          });
+                        }
+                      },
+                    ),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.timelapse_outlined),
+                      title: const Text('End time'),
+                      subtitle: Text(formatTimeOfDay(selectedEndTime)),
+                      onTap: () async {
+                        final picked = await showTimePicker(
+                          context: context,
+                          initialTime: selectedEndTime,
+                        );
+
+                        if (picked != null) {
+                          final startMinutes = selectedTime.hour * 60 + selectedTime.minute;
+                          final endMinutes = picked.hour * 60 + picked.minute;
+
+                          if (endMinutes <= startMinutes) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('End time must be after start time.'),
+                                ),
+                              );
+                            }
+                            return;
+                          }
+
+                          setDialogState(() => selectedEndTime = picked);
                         }
                       },
                     ),
@@ -118,6 +167,7 @@ class _SchedulePageState extends State<SchedulePage> {
                         id: existing?.id ?? 0,
                         title: titleController.text.trim(),
                         time: selectedTime,
+                        endTime: selectedEndTime,
                         repeatDays: selectedDays,
                       ),
                     );
@@ -324,9 +374,9 @@ class _SchedulePageState extends State<SchedulePage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  formatTimeOfDay(item.time),
+                  '${formatTimeOfDay(item.time)} – ${formatTimeOfDay(item.endTime)}',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 11,
                     color: Theme.of(context).colorScheme.primary,
                     fontWeight: FontWeight.bold,
                   ),
@@ -334,9 +384,9 @@ class _SchedulePageState extends State<SchedulePage> {
                 const SizedBox(height: 5),
                 Text(
                   item.title,
-                  maxLines: 3,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                 ),
               ],
             ),
@@ -362,6 +412,11 @@ class _SchedulePageState extends State<SchedulePage> {
                   style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
                 ),
                 const Spacer(),
+                IconButton(
+                  onPressed: _openImaluumImport,
+                  icon: const Icon(Icons.cloud_download_outlined),
+                  tooltip: "Import from i-Ma'luum",
+                ),
                 IconButton(
                   onPressed: showFirstDayDialog,
                   icon: const Icon(Icons.settings_outlined),
@@ -392,6 +447,28 @@ class _SchedulePageState extends State<SchedulePage> {
               ],
             ),
           ),
+          if (widget.schedule.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.swipe_left_alt_rounded,
+                    size: 16,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Swipe left to delete',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           const SizedBox(height: 12),
           Expanded(
             child: widget.schedule.isEmpty

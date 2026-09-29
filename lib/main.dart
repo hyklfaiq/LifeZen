@@ -7,6 +7,7 @@ import 'pages/home_page.dart';
 import 'pages/money_page.dart';
 import 'pages/planner_page.dart';
 import 'pages/schedule_page.dart';
+import 'services/imaluum/imaluum_timetable.dart';
 import 'storage/app_storage.dart';
 
 Future<void> main() async {
@@ -68,24 +69,90 @@ class _LifeZenAppState extends State<LifeZenApp> {
 
   @override
   Widget build(BuildContext context) {
+    final lightScheme = ColorScheme.fromSeed(
+      seedColor: const Color(0xFF6C7BFF),
+      brightness: Brightness.light,
+    );
+
+    final darkScheme = ColorScheme.fromSeed(
+      seedColor: const Color(0xFF8B7BFF),
+      brightness: Brightness.dark,
+    ).copyWith(
+      primary: const Color(0xFF8B7BFF),
+      secondary: const Color(0xFF5DE2C3),
+      tertiary: const Color(0xFF7DD3FC),
+      surface: const Color(0xFF0F172A),
+      onSurface: const Color(0xFFE2E8F0),
+      onSurfaceVariant: const Color(0xFFCBD5E1),
+      outline: const Color(0xFF334155),
+      outlineVariant: const Color(0xFF475569),
+      surfaceContainerHighest: const Color(0xFF1E293B),
+    );
+
     return MaterialApp(
       title: 'LifeZen',
       debugShowCheckedModeBanner: false,
-
       theme: ThemeData(
         brightness: Brightness.light,
         useMaterial3: true,
-        colorSchemeSeed: Colors.blue,
+        colorScheme: lightScheme,
+        scaffoldBackgroundColor: const Color(0xFFF4F6FB),
+        cardTheme: CardThemeData(
+          elevation: 0,
+          margin: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+          ),
+          color: Colors.white,
+        ),
+        navigationBarTheme: NavigationBarThemeData(
+          backgroundColor: Colors.white.withValues(alpha: 0.9),
+          surfaceTintColor: Colors.transparent,
+          indicatorColor: lightScheme.primary.withValues(alpha: 0.12),
+          shadowColor: Colors.black.withValues(alpha: 0.06),
+          elevation: 0,
+          labelTextStyle: WidgetStateProperty.all(
+            const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          ),
+        ),
+        dialogTheme: DialogThemeData(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+          ),
+        ),
       ),
-
       darkTheme: ThemeData(
         brightness: Brightness.dark,
         useMaterial3: true,
-        colorSchemeSeed: Colors.blue,
+        colorScheme: darkScheme,
+        scaffoldBackgroundColor: const Color(0xFF0B1220),
+        cardTheme: CardThemeData(
+          elevation: 0,
+          margin: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+          ),
+          color: const Color(0xFF121C2E),
+        ),
+        navigationBarTheme: NavigationBarThemeData(
+          backgroundColor: const Color(0xFF111C2C).withValues(alpha: 0.96),
+          surfaceTintColor: Colors.transparent,
+          indicatorColor: darkScheme.primary.withValues(alpha: 0.24),
+          shadowColor: Colors.black.withValues(alpha: 0.24),
+          elevation: 0,
+          labelTextStyle: WidgetStateProperty.all(
+            const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          ),
+        ),
+        dialogTheme: DialogThemeData(
+          backgroundColor: const Color(0xFF121C2E),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+          ),
+        ),
       ),
-
       themeMode: themeMode,
-
       home: isStarting
           ? const StartupScreen()
           : MainScreen(
@@ -104,52 +171,84 @@ class StartupScreen extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    return Scaffold(
-      body: Center(
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            colorScheme.primary.withValues(alpha: 0.9),
+            colorScheme.secondary.withValues(alpha: 0.7),
+            theme.scaffoldBackgroundColor,
+          ],
+        ),
+      ),
+      child: Center(
         child: Padding(
           padding: const EdgeInsets.all(30),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(
-                width: 110,
-                height: 110,
-                decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.spa_outlined,
-                  size: 60,
-                  color: colorScheme.primary,
+              TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0.82, end: 1),
+                duration: const Duration(milliseconds: 700),
+                curve: Curves.easeOutBack,
+                builder: (context, scale, child) {
+                  return Transform.scale(
+                    scale: scale,
+                    child: child,
+                  );
+                },
+                child: Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.18),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.4),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: colorScheme.primary.withValues(alpha: 0.32),
+                        blurRadius: 28,
+                        offset: const Offset(0, 18),
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    Icons.spa_outlined,
+                    size: 58,
+                    color: Colors.white,
+                  ),
                 ),
               ),
-
               const SizedBox(height: 28),
-
               Text(
                 'LifeZen',
                 style: theme.textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                  letterSpacing: -0.5,
                 ),
               ),
-
               const SizedBox(height: 8),
-
               Text(
                 'Plan your day. Live better.',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodyLarge?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
+                  color: Colors.white.withValues(alpha: 0.82),
                 ),
               ),
-
               const SizedBox(height: 40),
-
-              const SizedBox(
-                width: 28,
-                height: 28,
-                child: CircularProgressIndicator(strokeWidth: 3),
+              SizedBox(
+                width: 36,
+                height: 36,
+                child: CircularProgressIndicator(
+                  strokeWidth: 3,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
               ),
             ],
           ),
@@ -177,6 +276,7 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
+  final PageController pageController = PageController();
   List<Task> tasks = [];
   List<SleepRecord> sleepRecords = [];
   List<Expense> expenses = [];
@@ -186,6 +286,7 @@ class _MainScreenState extends State<MainScreen> {
 
   double monthlyBudget = 800;
   int sleepGoalHours = 8;
+  int reminderMinutes = 10;
 
   int firstDayOfWeek = 1;
   int currentIndex = 0;
@@ -197,6 +298,12 @@ class _MainScreenState extends State<MainScreen> {
     super.initState();
 
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    pageController.dispose();
+    super.dispose();
   }
 
   Future<void> setFirstDayOfWeek(int day) async {
@@ -218,6 +325,17 @@ class _MainScreenState extends State<MainScreen> {
 
     setState(() {});
   }
+
+  Future<void> updateReminderMinutes(int minutes) async {
+    reminderMinutes = minutes;
+
+    await AppStorage.saveReminderMinutes(minutes);
+    await _refreshNotifications();
+
+    if (!mounted) return;
+
+    setState(() {});
+  }
   // ==========================================================
   // LOAD DATA
   // ==========================================================
@@ -229,6 +347,7 @@ class _MainScreenState extends State<MainScreen> {
     final loadedSchedule = await AppStorage.loadSchedule();
     final loadedSavings = await AppStorage.loadSavingsGoal();
     final loadedSleepGoal = await AppStorage.loadSleepGoal();
+    final loadedReminderMinutes = await AppStorage.loadReminderMinutes();
 
     final loadedBudget = await AppStorage.loadBudget();
     final loadedFirstDay = await AppStorage.loadFirstDayOfWeek();
@@ -244,6 +363,7 @@ class _MainScreenState extends State<MainScreen> {
     monthlyBudget = loadedBudget;
     firstDayOfWeek = loadedFirstDay;
     sleepGoalHours = loadedSleepGoal;
+    reminderMinutes = loadedReminderMinutes;
 
     if (loadedSavings != null) {
       savingsGoal = SavingsGoal.fromMap(loadedSavings);
@@ -276,6 +396,7 @@ class _MainScreenState extends State<MainScreen> {
             id: task.id,
             title: task.title,
             dateTime: task.dueDate,
+            reminderMinutes: reminderMinutes,
           );
         } catch (e) {
           debugPrint('Failed to restore task notification: $e');
@@ -292,6 +413,7 @@ class _MainScreenState extends State<MainScreen> {
             weekday: day,
             hour: item.time.hour,
             minute: item.time.minute,
+            reminderMinutes: reminderMinutes,
           );
         } catch (e) {
           debugPrint('Failed to restore schedule notification: $e');
@@ -313,6 +435,7 @@ class _MainScreenState extends State<MainScreen> {
       id: DateTime.now().millisecondsSinceEpoch,
       title: item.title,
       time: item.time,
+      endTime: item.endTime,
       repeatDays: List<int>.from(item.repeatDays),
     );
 
@@ -337,11 +460,53 @@ class _MainScreenState extends State<MainScreen> {
           weekday: day,
           hour: newItem.time.hour,
           minute: newItem.time.minute,
+          reminderMinutes: reminderMinutes,
         );
       } catch (e) {
         debugPrint('Schedule notification failed: $e');
       }
     }
+  }
+
+  Future<int> importImaluumSchedule(List<ImaluumMeeting> meetings) async {
+    final existingKeys = schedule.map((item) => item.importKey).whereType<String>();
+    final added = <ScheduleItem>[];
+    for (final meeting in excludeImportedMeetings(meetings, existingKeys)) {
+      final details = [
+        meeting.courseCode,
+        if (meeting.courseName != meeting.courseCode) meeting.courseName,
+        if (meeting.section != null) 'Section ${meeting.section}',
+        if (meeting.venue != null) meeting.venue!,
+      ];
+      added.add(ScheduleItem(
+        id: DateTime.now().microsecondsSinceEpoch + added.length,
+        title: details.join(' • '),
+        time: meeting.start,
+        endTime: meeting.end,
+        repeatDays: [meeting.day],
+        importKey: meeting.importKey,
+        courseCode: meeting.courseCode,
+        courseName: meeting.courseName,
+        venue: meeting.venue,
+        lecturer: meeting.lecturer,
+        section: meeting.section,
+        semester: meeting.semester,
+      ));
+    }
+    if (added.isEmpty) return 0;
+    schedule.addAll(added);
+    if (mounted) setState(() {});
+    await AppStorage.saveSchedule(schedule.map((item) => item.toMap()).toList());
+    for (final item in added) {
+      for (final day in item.repeatDays) {
+        try {
+          await NotificationService.scheduleWeekly(id: _scheduleNotificationId(item.id, day), title: item.title, weekday: day, hour: item.time.hour, minute: item.time.minute, reminderMinutes: reminderMinutes);
+        } catch (e) {
+          debugPrint('Imported schedule notification failed: $e');
+        }
+      }
+    }
+    return added.length;
   }
 
   Future<void> updateSchedule(ScheduleItem updatedItem) async {
@@ -366,7 +531,15 @@ class _MainScreenState extends State<MainScreen> {
       id: updatedItem.id,
       title: updatedItem.title,
       time: updatedItem.time,
+      endTime: updatedItem.endTime,
       repeatDays: List<int>.from(updatedItem.repeatDays),
+      importKey: oldItem.importKey,
+      courseCode: oldItem.courseCode,
+      courseName: oldItem.courseName,
+      venue: oldItem.venue,
+      lecturer: oldItem.lecturer,
+      section: oldItem.section,
+      semester: oldItem.semester,
     );
 
     // Update UI immediately
@@ -388,6 +561,7 @@ class _MainScreenState extends State<MainScreen> {
           weekday: day,
           hour: updatedItem.time.hour,
           minute: updatedItem.time.minute,
+          reminderMinutes: reminderMinutes,
         );
       } catch (e) {
         debugPrint('Updated schedule notification failed: $e');
@@ -443,6 +617,7 @@ class _MainScreenState extends State<MainScreen> {
       id: newTask.id,
       title: newTask.title,
       dateTime: newTask.dueDate,
+      reminderMinutes: reminderMinutes,
     );
 
     if (!mounted) return;
@@ -466,6 +641,7 @@ class _MainScreenState extends State<MainScreen> {
         id: task.id,
         title: task.title,
         dateTime: task.dueDate,
+        reminderMinutes: reminderMinutes,
       );
     }
 
@@ -684,6 +860,8 @@ class _MainScreenState extends State<MainScreen> {
         onToggleTask: toggleTask,
         isDarkMode: widget.isDarkMode,
         onToggleTheme: widget.onToggleTheme,
+        reminderMinutes: reminderMinutes,
+        onReminderMinutesChanged: updateReminderMinutes,
       ),
       PlannerPage(
         tasks: tasks,
@@ -698,6 +876,7 @@ class _MainScreenState extends State<MainScreen> {
         onAddSchedule: addSchedule,
         onUpdateSchedule: updateSchedule,
         onDeleteSchedule: deleteSchedule,
+        onImportImaluum: importImaluumSchedule,
       ),
       HealthPage(
         sleepRecords: sleepRecords,
@@ -722,41 +901,55 @@ class _MainScreenState extends State<MainScreen> {
     ];
 
     return Scaffold(
-      body: pages[currentIndex],
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: currentIndex,
-        onDestinationSelected: (index) {
-          setState(() {
-            currentIndex = index;
-          });
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.calendar_month_outlined),
-            selectedIcon: Icon(Icons.calendar_month),
-            label: 'Planner',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.schedule_outlined),
-            selectedIcon: Icon(Icons.schedule),
-            label: 'Schedule',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.favorite_outline),
-            selectedIcon: Icon(Icons.favorite),
-            label: 'Health',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.account_balance_wallet_outlined),
-            selectedIcon: Icon(Icons.account_balance_wallet),
-            label: 'Money',
-          ),
-        ],
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: PageView(
+        controller: pageController,
+        physics: const NeverScrollableScrollPhysics(),
+        children: pages,
+      ),
+      bottomNavigationBar: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        child: NavigationBar(
+          selectedIndex: currentIndex,
+          onDestinationSelected: (index) {
+            setState(() {
+              currentIndex = index;
+            });
+
+            pageController.animateToPage(
+              index,
+              duration: const Duration(milliseconds: 350),
+              curve: Curves.easeOutCubic,
+            );
+          },
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.home_outlined),
+              selectedIcon: Icon(Icons.home_rounded),
+              label: 'Home',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.calendar_month_outlined),
+              selectedIcon: Icon(Icons.calendar_month_rounded),
+              label: 'Planner',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.schedule_outlined),
+              selectedIcon: Icon(Icons.schedule_rounded),
+              label: 'Schedule',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.favorite_outline),
+              selectedIcon: Icon(Icons.favorite_rounded),
+              label: 'Health',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.account_balance_wallet_outlined),
+              selectedIcon: Icon(Icons.account_balance_wallet_rounded),
+              label: 'Money',
+            ),
+          ],
+        ),
       ),
     );
   }
