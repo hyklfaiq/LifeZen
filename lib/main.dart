@@ -17,6 +17,7 @@ Future<void> main() async {
 
   runApp(const LifeZenApp());
 }
+
 // ============================================================
 // APP
 // ============================================================
@@ -35,7 +36,6 @@ class _LifeZenAppState extends State<LifeZenApp> {
   @override
   void initState() {
     super.initState();
-
     _startApp();
   }
 
@@ -74,20 +74,21 @@ class _LifeZenAppState extends State<LifeZenApp> {
       brightness: Brightness.light,
     );
 
-    final darkScheme = ColorScheme.fromSeed(
-      seedColor: const Color(0xFF8B7BFF),
-      brightness: Brightness.dark,
-    ).copyWith(
-      primary: const Color(0xFF8B7BFF),
-      secondary: const Color(0xFF5DE2C3),
-      tertiary: const Color(0xFF7DD3FC),
-      surface: const Color(0xFF0F172A),
-      onSurface: const Color(0xFFE2E8F0),
-      onSurfaceVariant: const Color(0xFFCBD5E1),
-      outline: const Color(0xFF334155),
-      outlineVariant: const Color(0xFF475569),
-      surfaceContainerHighest: const Color(0xFF1E293B),
-    );
+    final darkScheme =
+        ColorScheme.fromSeed(
+          seedColor: const Color(0xFF8B7BFF),
+          brightness: Brightness.dark,
+        ).copyWith(
+          primary: const Color(0xFF8B7BFF),
+          secondary: const Color(0xFF5DE2C3),
+          tertiary: const Color(0xFF7DD3FC),
+          surface: const Color(0xFF0F172A),
+          onSurface: const Color(0xFFE2E8F0),
+          onSurfaceVariant: const Color(0xFFCBD5E1),
+          outline: const Color(0xFF334155),
+          outlineVariant: const Color(0xFF475569),
+          surfaceContainerHighest: const Color(0xFF1E293B),
+        );
 
     return MaterialApp(
       title: 'LifeZen',
@@ -163,6 +164,10 @@ class _LifeZenAppState extends State<LifeZenApp> {
   }
 }
 
+// ============================================================
+// STARTUP SCREEN
+// ============================================================
+
 class StartupScreen extends StatelessWidget {
   const StartupScreen({super.key});
 
@@ -194,10 +199,7 @@ class StartupScreen extends StatelessWidget {
                 duration: const Duration(milliseconds: 700),
                 curve: Curves.easeOutBack,
                 builder: (context, scale, child) {
-                  return Transform.scale(
-                    scale: scale,
-                    child: child,
-                  );
+                  return Transform.scale(scale: scale, child: child);
                 },
                 child: Container(
                   width: 120,
@@ -217,7 +219,7 @@ class StartupScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-                  child: Icon(
+                  child: const Icon(
                     Icons.spa_outlined,
                     size: 58,
                     color: Colors.white,
@@ -242,7 +244,7 @@ class StartupScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 40),
-              SizedBox(
+              const SizedBox(
                 width: 36,
                 height: 36,
                 child: CircularProgressIndicator(
@@ -265,6 +267,7 @@ class StartupScreen extends StatelessWidget {
 class MainScreen extends StatefulWidget {
   final VoidCallback onToggleTheme;
   final bool isDarkMode;
+
   const MainScreen({
     super.key,
     required this.onToggleTheme,
@@ -277,6 +280,7 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   final PageController pageController = PageController();
+
   List<Task> tasks = [];
   List<SleepRecord> sleepRecords = [];
   List<Expense> expenses = [];
@@ -287,16 +291,13 @@ class _MainScreenState extends State<MainScreen> {
   double monthlyBudget = 800;
   int sleepGoalHours = 8;
   int reminderMinutes = 10;
-
   int firstDayOfWeek = 1;
   int currentIndex = 0;
-
   bool isLoading = true;
 
   @override
   void initState() {
     super.initState();
-
     _loadData();
   }
 
@@ -305,6 +306,10 @@ class _MainScreenState extends State<MainScreen> {
     pageController.dispose();
     super.dispose();
   }
+
+  // ==========================================================
+  // SETTINGS
+  // ==========================================================
 
   Future<void> setFirstDayOfWeek(int day) async {
     firstDayOfWeek = day;
@@ -330,12 +335,14 @@ class _MainScreenState extends State<MainScreen> {
     reminderMinutes = minutes;
 
     await AppStorage.saveReminderMinutes(minutes);
+
     await _refreshNotifications();
 
     if (!mounted) return;
 
     setState(() {});
   }
+
   // ==========================================================
   // LOAD DATA
   // ==========================================================
@@ -348,16 +355,12 @@ class _MainScreenState extends State<MainScreen> {
     final loadedSavings = await AppStorage.loadSavingsGoal();
     final loadedSleepGoal = await AppStorage.loadSleepGoal();
     final loadedReminderMinutes = await AppStorage.loadReminderMinutes();
-
     final loadedBudget = await AppStorage.loadBudget();
     final loadedFirstDay = await AppStorage.loadFirstDayOfWeek();
 
     tasks = loadedTasks.map(Task.fromMap).toList();
-
     sleepRecords = loadedSleep.map(SleepRecord.fromMap).toList();
-
     expenses = loadedExpenses.map(Expense.fromMap).toList();
-
     schedule = loadedSchedule.map(ScheduleItem.fromMap).toList();
 
     monthlyBudget = loadedBudget;
@@ -441,17 +444,14 @@ class _MainScreenState extends State<MainScreen> {
 
     schedule.add(newItem);
 
-    // Show it immediately
     if (mounted) {
       setState(() {});
     }
 
-    // Save it
     await AppStorage.saveSchedule(
       schedule.map((item) => item.toMap()).toList(),
     );
 
-    // Notifications are optional
     for (final day in newItem.repeatDays) {
       try {
         await NotificationService.scheduleWeekly(
@@ -469,8 +469,12 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Future<int> importImaluumSchedule(List<ImaluumMeeting> meetings) async {
-    final existingKeys = schedule.map((item) => item.importKey).whereType<String>();
+    final existingKeys = schedule
+        .map((item) => item.importKey)
+        .whereType<String>();
+
     final added = <ScheduleItem>[];
+
     for (final meeting in excludeImportedMeetings(meetings, existingKeys)) {
       final details = [
         meeting.courseCode,
@@ -478,34 +482,54 @@ class _MainScreenState extends State<MainScreen> {
         if (meeting.section != null) 'Section ${meeting.section}',
         if (meeting.venue != null) meeting.venue!,
       ];
-      added.add(ScheduleItem(
-        id: DateTime.now().microsecondsSinceEpoch + added.length,
-        title: details.join(' • '),
-        time: meeting.start,
-        endTime: meeting.end,
-        repeatDays: [meeting.day],
-        importKey: meeting.importKey,
-        courseCode: meeting.courseCode,
-        courseName: meeting.courseName,
-        venue: meeting.venue,
-        lecturer: meeting.lecturer,
-        section: meeting.section,
-        semester: meeting.semester,
-      ));
+
+      added.add(
+        ScheduleItem(
+          id: DateTime.now().microsecondsSinceEpoch + added.length,
+          title: details.join(' • '),
+          time: meeting.start,
+          endTime: meeting.end,
+          repeatDays: [meeting.day],
+          importKey: meeting.importKey,
+          courseCode: meeting.courseCode,
+          courseName: meeting.courseName,
+          venue: meeting.venue,
+          lecturer: meeting.lecturer,
+          section: meeting.section,
+          semester: meeting.semester,
+        ),
+      );
     }
+
     if (added.isEmpty) return 0;
+
     schedule.addAll(added);
-    if (mounted) setState(() {});
-    await AppStorage.saveSchedule(schedule.map((item) => item.toMap()).toList());
+
+    if (mounted) {
+      setState(() {});
+    }
+
+    await AppStorage.saveSchedule(
+      schedule.map((item) => item.toMap()).toList(),
+    );
+
     for (final item in added) {
       for (final day in item.repeatDays) {
         try {
-          await NotificationService.scheduleWeekly(id: _scheduleNotificationId(item.id, day), title: item.title, weekday: day, hour: item.time.hour, minute: item.time.minute, reminderMinutes: reminderMinutes);
+          await NotificationService.scheduleWeekly(
+            id: _scheduleNotificationId(item.id, day),
+            title: item.title,
+            weekday: day,
+            hour: item.time.hour,
+            minute: item.time.minute,
+            reminderMinutes: reminderMinutes,
+          );
         } catch (e) {
           debugPrint('Imported schedule notification failed: $e');
         }
       }
     }
+
     return added.length;
   }
 
@@ -542,17 +566,14 @@ class _MainScreenState extends State<MainScreen> {
       semester: oldItem.semester,
     );
 
-    // Update UI immediately
     if (mounted) {
       setState(() {});
     }
 
-    // Save
     await AppStorage.saveSchedule(
       schedule.map((item) => item.toMap()).toList(),
     );
 
-    // Create new notifications
     for (final day in updatedItem.repeatDays) {
       try {
         await NotificationService.scheduleWeekly(
@@ -587,16 +608,46 @@ class _MainScreenState extends State<MainScreen> {
 
     schedule.removeAt(index);
 
-    // Update UI immediately
     if (mounted) {
       setState(() {});
     }
 
-    // Save
     await AppStorage.saveSchedule(
       schedule.map((item) => item.toMap()).toList(),
     );
   }
+
+  // ==========================================================
+  // CLEAR ALL SCHEDULES
+  // ==========================================================
+
+  Future<void> clearAllSchedules() async {
+    if (schedule.isEmpty) return;
+
+    // Cancel all schedule notifications
+    for (final item in schedule) {
+      for (final day in item.repeatDays) {
+        try {
+          await NotificationService.cancel(
+            _scheduleNotificationId(item.id, day),
+          );
+        } catch (e) {
+          debugPrint('Failed to cancel schedule notification: $e');
+        }
+      }
+    }
+
+    // Clear schedules from memory
+    schedule.clear();
+
+    // Save empty schedule list
+    await AppStorage.saveSchedule([]);
+
+    if (!mounted) return;
+
+    setState(() {});
+  }
+
   // ==========================================================
   // TASKS
   // ==========================================================
@@ -625,31 +676,46 @@ class _MainScreenState extends State<MainScreen> {
     setState(() {});
   }
 
-  Future<void> toggleTask(int taskId) async {
+ Future<void> toggleTask(int taskId) async {
     final index = tasks.indexWhere((task) => task.id == taskId);
 
     if (index == -1) return;
 
     final task = tasks[index];
 
+    // Update the task immediately.
     task.completed = !task.completed;
 
-    if (task.completed) {
-      await NotificationService.cancel(task.id);
-    } else {
-      await NotificationService.scheduleTask(
-        id: task.id,
-        title: task.title,
-        dateTime: task.dueDate,
-        reminderMinutes: reminderMinutes,
-      );
+    // IMPORTANT:
+    // Rebuild the UI immediately.
+    // This makes the Planner checkbox and strikethrough
+    // update without leaving the page.
+    if (mounted) {
+      setState(() {});
     }
 
-    await AppStorage.saveTasks(tasks.map((task) => task.toMap()).toList());
+    // Handle notification after UI has already updated.
+    try {
+      if (task.completed) {
+        await NotificationService.cancel(task.id);
+      } else {
+        await NotificationService.scheduleTask(
+          id: task.id,
+          title: task.title,
+          dateTime: task.dueDate,
+          reminderMinutes: reminderMinutes,
+        );
+      }
+    } catch (e) {
+      debugPrint('Failed to update task notification: $e');
+    }
 
-    if (!mounted) return;
-
-    setState(() {});
+    // Save the new completed state.
+    try {
+      await AppStorage.saveTasks(tasks.map((task) => task.toMap()).toList());
+    } catch (e) {
+      debugPrint('Failed to save task: $e');
+    }
   }
 
   Future<void> deleteTask(int taskId) async {
@@ -863,12 +929,14 @@ class _MainScreenState extends State<MainScreen> {
         reminderMinutes: reminderMinutes,
         onReminderMinutesChanged: updateReminderMinutes,
       ),
+
       PlannerPage(
         tasks: tasks,
         onAddTask: addTask,
         onToggleTask: toggleTask,
         onDeleteTask: deleteTask,
       ),
+
       SchedulePage(
         schedule: schedule,
         firstDayOfWeek: firstDayOfWeek,
@@ -877,7 +945,11 @@ class _MainScreenState extends State<MainScreen> {
         onUpdateSchedule: updateSchedule,
         onDeleteSchedule: deleteSchedule,
         onImportImaluum: importImaluumSchedule,
+
+        // NEW
+        onClearAll: clearAllSchedules,
       ),
+
       HealthPage(
         sleepRecords: sleepRecords,
         sleepGoalHours: sleepGoalHours,
@@ -885,6 +957,7 @@ class _MainScreenState extends State<MainScreen> {
         onDeleteSleep: deleteSleepRecord,
         onUpdateSleepGoal: updateSleepGoal,
       ),
+
       MoneyPage(
         expenses: expenses,
         monthlyBudget: monthlyBudget,
@@ -954,4 +1027,3 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 }
-

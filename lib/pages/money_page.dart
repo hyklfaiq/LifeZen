@@ -19,13 +19,16 @@ class MoneyPage extends StatelessWidget {
     required String name,
     required double targetAmount,
     String? imagePath,
-  }) onCreateSavings;
+  })
+  onCreateSavings;
 
   final Future<void> Function({
     required String name,
     required double targetAmount,
     String? imagePath,
-  }) onEditSavings;
+  })
+  onEditSavings;
+
   final Function(double) onAddSavings;
   final Function(double) onRemoveSavings;
   final Function() onDeleteSavings;
@@ -54,6 +57,7 @@ class MoneyPage extends StatelessWidget {
 
     final remaining = monthlyBudget - totalSpent;
     final weeklyBudget = monthlyBudget / 4;
+
     final budgetProgress = monthlyBudget <= 0
         ? 0.0
         : (totalSpent / monthlyBudget).clamp(0.0, 1.0).toDouble();
@@ -78,7 +82,9 @@ class MoneyPage extends StatelessWidget {
                 ),
               ],
             ),
+
             const SizedBox(height: 24),
+
             Card(
               elevation: 0,
               child: Padding(
@@ -127,13 +133,17 @@ class MoneyPage extends StatelessWidget {
                 ),
               ),
             ),
+
             const SizedBox(height: 12),
+
             OutlinedButton.icon(
               onPressed: () => showBudgetDialog(context),
               icon: const Icon(Icons.edit_outlined),
               label: const Text('Edit monthly budget'),
             ),
+
             const SizedBox(height: 12),
+
             Card(
               elevation: 0,
               child: ListTile(
@@ -149,7 +159,9 @@ class MoneyPage extends StatelessWidget {
                 ),
               ),
             ),
+
             const SizedBox(height: 24),
+
             Row(
               children: [
                 const Text(
@@ -163,6 +175,7 @@ class MoneyPage extends StatelessWidget {
                 ),
               ],
             ),
+
             if (expenses.isNotEmpty) ...[
               const SizedBox(height: 8),
               Row(
@@ -184,8 +197,11 @@ class MoneyPage extends StatelessWidget {
                 ],
               ),
             ],
+
             const SizedBox(height: 12),
+
             if (expenses.isEmpty) _emptyCard('No expenses yet.'),
+
             ...expenses.map(
               (expense) => Dismissible(
                 key: ValueKey('expense_${expense.id}'),
@@ -211,12 +227,16 @@ class MoneyPage extends StatelessWidget {
                 ),
               ),
             ),
+
             const SizedBox(height: 24),
+
             const Text(
               'Savings',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
+
             const SizedBox(height: 12),
+
             if (savingsGoal == null)
               _buildEmptySavings(context)
             else
@@ -279,7 +299,9 @@ class MoneyPage extends StatelessWidget {
                       ? const Icon(Icons.savings_outlined, size: 18)
                       : null,
                 ),
+
                 const SizedBox(width: 10),
+
                 Expanded(
                   child: Text(
                     goal.name,
@@ -289,11 +311,13 @@ class MoneyPage extends StatelessWidget {
                     ),
                   ),
                 ),
+
                 PopupMenuButton<String>(
                   onSelected: (value) {
                     if (value == 'edit') {
                       showEditSavingsDialog(context);
                     }
+
                     if (value == 'delete') {
                       showDeleteSavingsDialog(context);
                     }
@@ -305,7 +329,9 @@ class MoneyPage extends StatelessWidget {
                 ),
               ],
             ),
+
             const SizedBox(height: 14),
+
             Row(
               children: [
                 Expanded(
@@ -322,11 +348,16 @@ class MoneyPage extends StatelessWidget {
                 ),
               ],
             ),
+
             const SizedBox(height: 10),
+
             Text(
-              'RM${goal.currentAmount.toStringAsFixed(2)} / RM${goal.targetAmount.toStringAsFixed(2)}',
+              'RM${goal.currentAmount.toStringAsFixed(2)} / '
+              'RM${goal.targetAmount.toStringAsFixed(2)}',
             ),
+
             const SizedBox(height: 16),
+
             Row(
               children: [
                 Expanded(
@@ -375,487 +406,124 @@ class MoneyPage extends StatelessWidget {
     );
   }
 
-  Future<void> showAddExpenseDialog(BuildContext context) async {
-    final titleController = TextEditingController();
-    final amountController = TextEditingController();
-    String category = 'Food';
+  // ---------------------------------------------------------------------------
+  // ADD EXPENSE
+  // ---------------------------------------------------------------------------
 
+  Future<void> showAddExpenseDialog(BuildContext context) async {
     final result = await showDialog<Expense>(
       context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Text('Add Expense'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: titleController,
-                      decoration: const InputDecoration(
-                        labelText: 'Expense',
-                        hintText: 'e.g. Lunch',
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: amountController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: const InputDecoration(
-                        labelText: 'Amount',
-                        prefixText: 'RM ',
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      initialValue: category,
-                      decoration: const InputDecoration(labelText: 'Category'),
-                      items: const [
-                        DropdownMenuItem(value: 'Food', child: Text('Food')),
-                        DropdownMenuItem(value: 'Transport', child: Text('Transport')),
-                        DropdownMenuItem(value: 'Education', child: Text('Education')),
-                        DropdownMenuItem(value: 'Entertainment', child: Text('Entertainment')),
-                        DropdownMenuItem(value: 'Shopping', child: Text('Shopping')),
-                        DropdownMenuItem(value: 'Bills', child: Text('Bills')),
-                        DropdownMenuItem(value: 'Other', child: Text('Other')),
-                      ],
-                      onChanged: (value) {
-                        if (value != null) {
-                          setDialogState(() => category = value);
-                        }
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext),
-                  child: const Text('Cancel'),
-                ),
-                FilledButton(
-                  onPressed: () {
-                    final amount = double.tryParse(amountController.text.trim());
-                    if (titleController.text.trim().isEmpty ||
-                        amount == null ||
-                        amount <= 0) {
-                      return;
-                    }
-                    Navigator.pop(
-                      dialogContext,
-                      Expense(
-                        id: 0,
-                        title: titleController.text.trim(),
-                        amount: amount,
-                        category: category,
-                        date: DateTime.now(),
-                      ),
-                    );
-                  },
-                  child: const Text('Save'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+      builder: (_) => const _AddExpenseDialog(),
     );
-
-    titleController.dispose();
-    amountController.dispose();
 
     if (result != null) {
       onAddExpense(result);
     }
   }
 
-  Future<void> showBudgetDialog(BuildContext context) async {
-    final controller = TextEditingController(
-      text: monthlyBudget.toStringAsFixed(2),
-    );
+  // ---------------------------------------------------------------------------
+  // BUDGET
+  // ---------------------------------------------------------------------------
 
+  Future<void> showBudgetDialog(BuildContext context) async {
     final result = await showDialog<double>(
       context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Monthly Budget'),
-          content: TextField(
-            controller: controller,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(
-              prefixText: 'RM ',
-              labelText: 'Budget',
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () {
-                final amount = double.tryParse(controller.text.trim());
-                if (amount != null && amount >= 0) {
-                  Navigator.pop(dialogContext, amount);
-                }
-              },
-              child: const Text('Save'),
-            ),
-          ],
-        );
-      },
+      builder: (_) => _BudgetDialog(initialBudget: monthlyBudget),
     );
-
-    controller.dispose();
 
     if (result != null) {
       onUpdateBudget(result);
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // CREATE SAVINGS
+  // ---------------------------------------------------------------------------
+
   Future<void> showCreateSavingsDialog(BuildContext context) async {
-    final nameController = TextEditingController();
-    final targetController = TextEditingController();
-    String? imagePath;
-
-    final result = await showDialog<Map<String, dynamic>>(
+    final result = await showDialog<_SavingsDialogResult>(
       context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            Future<void> pickImage() async {
-              final picked = await ImagePicker().pickImage(
-                source: ImageSource.gallery,
-                imageQuality: 80,
-              );
-
-              if (picked != null) {
-                setDialogState(() => imagePath = picked.path);
-              }
-            }
-
-            return AlertDialog(
-              title: const Text('Create Savings Goal'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Center(
-                      child: GestureDetector(
-                        onTap: pickImage,
-                        child: Stack(
-                          children: [
-                            CircleAvatar(
-                              radius: 44,
-                              backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
-                              backgroundImage: imagePath == null ? null : FileImage(File(imagePath!)),
-                              child: imagePath == null
-                                  ? const Icon(Icons.add_a_photo_outlined, size: 28)
-                                  : null,
-                            ),
-                            Positioned(
-                              right: 0,
-                              bottom: 0,
-                              child: Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: BoxDecoration(
-                                  color: Theme.of(context).colorScheme.primary,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(Icons.edit, size: 14, color: Colors.white),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      imagePath == null ? 'Add a photo (optional)' : 'Tap to change photo',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: nameController,
-                      decoration: const InputDecoration(
-                        labelText: 'Goal name',
-                        hintText: 'e.g. New laptop',
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: targetController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(
-                        labelText: 'Target amount',
-                        prefixText: 'RM ',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext),
-                  child: const Text('Cancel'),
-                ),
-                FilledButton(
-                  onPressed: () {
-                    final target = double.tryParse(targetController.text.trim());
-                    if (nameController.text.trim().isEmpty ||
-                        target == null ||
-                        target <= 0) {
-                      return;
-                    }
-                    Navigator.pop(dialogContext, {
-                      'name': nameController.text.trim(),
-                      'target': target,
-                      'imagePath': imagePath,
-                    });
-                  },
-                  child: const Text('Create'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+      builder: (_) => const _SavingsDialog(
+        title: 'Create Savings Goal',
+        buttonText: 'Create',
+      ),
     );
 
-    nameController.dispose();
-    targetController.dispose();
-
     if (result == null) return;
-
-    final name = result['name'] as String;
-    final targetAmount = (result['target'] as num).toDouble();
-    final resultImagePath = result['imagePath'] as String?;
 
     await onCreateSavings(
-      name: name,
-      targetAmount: targetAmount,
-      imagePath: resultImagePath,
+      name: result.name,
+      targetAmount: result.targetAmount,
+      imagePath: result.imagePath,
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // EDIT SAVINGS
+  // ---------------------------------------------------------------------------
+
   Future<void> showEditSavingsDialog(BuildContext context) async {
-    if (savingsGoal == null) return;
+    final goal = savingsGoal;
 
-    final nameController = TextEditingController(text: savingsGoal!.name);
-    final targetController = TextEditingController(
-      text: savingsGoal!.targetAmount.toStringAsFixed(2),
-    );
-    String? imagePath = savingsGoal!.imagePath;
+    if (goal == null) return;
 
-    final result = await showDialog<Map<String, dynamic>>(
+    final result = await showDialog<_SavingsDialogResult>(
       context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            Future<void> pickImage() async {
-              final picked = await ImagePicker().pickImage(
-                source: ImageSource.gallery,
-                imageQuality: 80,
-              );
-
-              if (picked != null) {
-                setDialogState(() => imagePath = picked.path);
-              }
-            }
-
-            return AlertDialog(
-              title: const Text('Edit Savings Goal'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Center(
-                      child: GestureDetector(
-                        onTap: pickImage,
-                        child: Stack(
-                          children: [
-                            CircleAvatar(
-                              radius: 44,
-                              backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
-                              backgroundImage: imagePath == null ? null : FileImage(File(imagePath!)),
-                              child: imagePath == null
-                                  ? const Icon(Icons.add_a_photo_outlined, size: 28)
-                                  : null,
-                            ),
-                            Positioned(
-                              right: 0,
-                              bottom: 0,
-                              child: Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: BoxDecoration(
-                                  color: Theme.of(context).colorScheme.primary,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(Icons.edit, size: 14, color: Colors.white),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      imagePath == null ? 'Add a photo (optional)' : 'Tap to change photo',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: nameController,
-                      decoration: const InputDecoration(labelText: 'Goal name'),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: targetController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(
-                        labelText: 'Target amount',
-                        prefixText: 'RM ',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext),
-                  child: const Text('Cancel'),
-                ),
-                FilledButton(
-                  onPressed: () {
-                    final target = double.tryParse(targetController.text.trim());
-                    if (nameController.text.trim().isEmpty ||
-                        target == null ||
-                        target <= 0) {
-                      return;
-                    }
-                    Navigator.pop(dialogContext, {
-                      'name': nameController.text.trim(),
-                      'target': target,
-                      'imagePath': imagePath,
-                    });
-                  },
-                  child: const Text('Save'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+      builder: (_) => _SavingsDialog(
+        title: 'Edit Savings Goal',
+        buttonText: 'Save',
+        initialName: goal.name,
+        initialTarget: goal.targetAmount,
+        initialImagePath: goal.imagePath,
+      ),
     );
-
-    nameController.dispose();
-    targetController.dispose();
 
     if (result == null) return;
 
-    final name = result['name'] as String;
-    final targetAmount = (result['target'] as num).toDouble();
-    final resultImagePath = result['imagePath'] as String?;
-
     await onEditSavings(
-      name: name,
-      targetAmount: targetAmount,
-      imagePath: resultImagePath,
+      name: result.name,
+      targetAmount: result.targetAmount,
+      imagePath: result.imagePath,
     );
   }
 
-  Future<void> showAddSavingsDialog(BuildContext context) async {
-    final controller = TextEditingController();
+  // ---------------------------------------------------------------------------
+  // ADD SAVINGS
+  // ---------------------------------------------------------------------------
 
+  Future<void> showAddSavingsDialog(BuildContext context) async {
     final result = await showDialog<double>(
       context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Add Savings'),
-          content: TextField(
-            controller: controller,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(
-              prefixText: 'RM ',
-              labelText: 'Amount',
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () {
-                final amount = double.tryParse(controller.text.trim());
-                if (amount != null && amount > 0) {
-                  Navigator.pop(dialogContext, amount);
-                }
-              },
-              child: const Text('Add'),
-            ),
-          ],
-        );
-      },
+      builder: (_) =>
+          const _SavingsAmountDialog(title: 'Add Savings', buttonText: 'Add'),
     );
-
-    controller.dispose();
 
     if (result != null) {
       onAddSavings(result);
     }
   }
 
-  Future<void> showRemoveSavingsDialog(BuildContext context) async {
-    final controller = TextEditingController();
+  // ---------------------------------------------------------------------------
+  // REMOVE SAVINGS
+  // ---------------------------------------------------------------------------
 
+  Future<void> showRemoveSavingsDialog(BuildContext context) async {
     final result = await showDialog<double>(
       context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Remove Savings'),
-          content: TextField(
-            controller: controller,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(
-              prefixText: 'RM ',
-              labelText: 'Amount',
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () {
-                final amount = double.tryParse(controller.text.trim());
-                if (amount != null && amount > 0) {
-                  Navigator.pop(dialogContext, amount);
-                }
-              },
-              child: const Text('Remove'),
-            ),
-          ],
-        );
-      },
+      builder: (_) => const _SavingsAmountDialog(
+        title: 'Remove Savings',
+        buttonText: 'Remove',
+      ),
     );
-
-    controller.dispose();
 
     if (result != null) {
       onRemoveSavings(result);
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // DELETE SAVINGS
+  // ---------------------------------------------------------------------------
 
   Future<void> showDeleteSavingsDialog(BuildContext context) async {
     final confirmed = await showDialog<bool>(
@@ -868,11 +536,15 @@ class MoneyPage extends StatelessWidget {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
+              onPressed: () {
+                Navigator.of(dialogContext).pop(false);
+              },
               child: const Text('Cancel'),
             ),
             FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
+              onPressed: () {
+                Navigator.of(dialogContext).pop(true);
+              },
               child: const Text('Delete'),
             ),
           ],
@@ -883,5 +555,459 @@ class MoneyPage extends StatelessWidget {
     if (confirmed == true) {
       onDeleteSavings();
     }
+  }
+}
+
+// =============================================================================
+// ADD EXPENSE DIALOG
+// =============================================================================
+
+class _AddExpenseDialog extends StatefulWidget {
+  const _AddExpenseDialog();
+
+  @override
+  State<_AddExpenseDialog> createState() => _AddExpenseDialogState();
+}
+
+class _AddExpenseDialogState extends State<_AddExpenseDialog> {
+  late final TextEditingController _titleController;
+  late final TextEditingController _amountController;
+
+  String _category = 'Food';
+
+  @override
+  void initState() {
+    super.initState();
+
+    _titleController = TextEditingController();
+    _amountController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _amountController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final title = _titleController.text.trim();
+    final amount = double.tryParse(_amountController.text.trim());
+
+    if (title.isEmpty || amount == null || amount <= 0) {
+      return;
+    }
+
+    Navigator.of(context).pop(
+      Expense(
+        id: 0,
+        title: title,
+        amount: amount,
+        category: _category,
+        date: DateTime.now(),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Add Expense'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _titleController,
+              autofocus: true,
+              textInputAction: TextInputAction.next,
+              decoration: const InputDecoration(
+                labelText: 'Expense',
+                hintText: 'e.g. Lunch',
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            TextField(
+              controller: _amountController,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              textInputAction: TextInputAction.done,
+              decoration: const InputDecoration(
+                labelText: 'Amount',
+                prefixText: 'RM ',
+              ),
+              onSubmitted: (_) => _submit(),
+            ),
+
+            const SizedBox(height: 12),
+
+            DropdownButtonFormField<String>(
+              initialValue: _category,
+              decoration: const InputDecoration(labelText: 'Category'),
+              items: const [
+                DropdownMenuItem(value: 'Food', child: Text('Food')),
+                DropdownMenuItem(value: 'Transport', child: Text('Transport')),
+                DropdownMenuItem(value: 'Education', child: Text('Education')),
+                DropdownMenuItem(
+                  value: 'Entertainment',
+                  child: Text('Entertainment'),
+                ),
+                DropdownMenuItem(value: 'Shopping', child: Text('Shopping')),
+                DropdownMenuItem(value: 'Bills', child: Text('Bills')),
+                DropdownMenuItem(value: 'Other', child: Text('Other')),
+              ],
+              onChanged: (value) {
+                if (value == null) return;
+
+                setState(() {
+                  _category = value;
+                });
+              },
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(onPressed: _submit, child: const Text('Save')),
+      ],
+    );
+  }
+}
+
+// =============================================================================
+// BUDGET DIALOG
+// =============================================================================
+
+class _BudgetDialog extends StatefulWidget {
+  const _BudgetDialog({required this.initialBudget});
+
+  final double initialBudget;
+
+  @override
+  State<_BudgetDialog> createState() => _BudgetDialogState();
+}
+
+class _BudgetDialogState extends State<_BudgetDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _controller = TextEditingController(
+      text: widget.initialBudget.toStringAsFixed(2),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final amount = double.tryParse(_controller.text.trim());
+
+    if (amount == null || amount < 0) {
+      return;
+    }
+
+    Navigator.of(context).pop(amount);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Monthly Budget'),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        textInputAction: TextInputAction.done,
+        decoration: const InputDecoration(
+          prefixText: 'RM ',
+          labelText: 'Budget',
+        ),
+        onSubmitted: (_) => _submit(),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(onPressed: _submit, child: const Text('Save')),
+      ],
+    );
+  }
+}
+
+// =============================================================================
+// SAVINGS GOAL RESULT
+// =============================================================================
+
+class _SavingsDialogResult {
+  final String name;
+  final double targetAmount;
+  final String? imagePath;
+
+  const _SavingsDialogResult({
+    required this.name,
+    required this.targetAmount,
+    required this.imagePath,
+  });
+}
+
+// =============================================================================
+// CREATE / EDIT SAVINGS DIALOG
+// =============================================================================
+
+class _SavingsDialog extends StatefulWidget {
+  const _SavingsDialog({
+    required this.title,
+    required this.buttonText,
+    this.initialName = '',
+    this.initialTarget,
+    this.initialImagePath,
+  });
+
+  final String title;
+  final String buttonText;
+
+  final String initialName;
+  final double? initialTarget;
+  final String? initialImagePath;
+
+  @override
+  State<_SavingsDialog> createState() => _SavingsDialogState();
+}
+
+class _SavingsDialogState extends State<_SavingsDialog> {
+  late final TextEditingController _nameController;
+  late final TextEditingController _targetController;
+
+  String? _imagePath;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _nameController = TextEditingController(text: widget.initialName);
+
+    _targetController = TextEditingController(
+      text: widget.initialTarget?.toStringAsFixed(2) ?? '',
+    );
+
+    _imagePath = widget.initialImagePath;
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _targetController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    final picked = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 80,
+    );
+
+    if (!mounted) return;
+
+    if (picked != null) {
+      setState(() {
+        _imagePath = picked.path;
+      });
+    }
+  }
+
+  void _submit() {
+    final name = _nameController.text.trim();
+
+    final target = double.tryParse(_targetController.text.trim());
+
+    if (name.isEmpty || target == null || target <= 0) {
+      return;
+    }
+
+    Navigator.of(context).pop(
+      _SavingsDialogResult(
+        name: name,
+        targetAmount: target,
+        imagePath: _imagePath,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Center(
+              child: GestureDetector(
+                onTap: _pickImage,
+                child: Stack(
+                  children: [
+                    CircleAvatar(
+                      radius: 44,
+                      backgroundColor: Theme.of(
+                        context,
+                      ).colorScheme.secondaryContainer,
+                      backgroundImage: _imagePath == null
+                          ? null
+                          : FileImage(File(_imagePath!)),
+                      child: _imagePath == null
+                          ? const Icon(Icons.add_a_photo_outlined, size: 28)
+                          : null,
+                    ),
+
+                    Positioned(
+                      right: 0,
+                      bottom: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.edit,
+                          size: 14,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 6),
+
+            Text(
+              _imagePath == null
+                  ? 'Add a photo (optional)'
+                  : 'Tap to change photo',
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            TextField(
+              controller: _nameController,
+              autofocus: true,
+              textInputAction: TextInputAction.next,
+              decoration: InputDecoration(
+                labelText: 'Goal name',
+                hintText: widget.initialName.isEmpty ? 'e.g. New laptop' : null,
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            TextField(
+              controller: _targetController,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              textInputAction: TextInputAction.done,
+              decoration: const InputDecoration(
+                labelText: 'Target amount',
+                prefixText: 'RM ',
+              ),
+              onSubmitted: (_) => _submit(),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(onPressed: _submit, child: Text(widget.buttonText)),
+      ],
+    );
+  }
+}
+
+// =============================================================================
+// ADD / REMOVE SAVINGS AMOUNT DIALOG
+// =============================================================================
+
+class _SavingsAmountDialog extends StatefulWidget {
+  const _SavingsAmountDialog({required this.title, required this.buttonText});
+
+  final String title;
+  final String buttonText;
+
+  @override
+  State<_SavingsAmountDialog> createState() => _SavingsAmountDialogState();
+}
+
+class _SavingsAmountDialogState extends State<_SavingsAmountDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _controller = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final amount = double.tryParse(_controller.text.trim());
+
+    if (amount == null || amount <= 0) {
+      return;
+    }
+
+    Navigator.of(context).pop(amount);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        textInputAction: TextInputAction.done,
+        decoration: const InputDecoration(
+          prefixText: 'RM ',
+          labelText: 'Amount',
+        ),
+        onSubmitted: (_) => _submit(),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(onPressed: _submit, child: Text(widget.buttonText)),
+      ],
+    );
   }
 }
