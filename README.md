@@ -172,7 +172,7 @@ The generated APK can be found at:
 ```bash
 build/app/outputs/flutter-apk/app-release.apk
 ```
-
+```text
 LifeZen/
 ├── android/
 ├── ios/
@@ -210,13 +210,14 @@ LifeZen/
 ├── pubspec.yaml
 ├── analysis_options.yaml
 └── README.md
+```
 
 # Technology
 
 LifeZen is built using:
 
 - [Flutter](https://flutter.dev/)
-- Dart
+- [Dart](https://dart.dev/)
 - [Shared Preferences](https://pub.dev/packages/shared_preferences)
 - [Flutter Local Notifications](https://pub.dev/packages/flutter_local_notifications)
 - [Flutter Timezone](https://pub.dev/packages/flutter_timezone)
