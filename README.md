@@ -1,4 +1,51 @@
 # LifeZen
+<p align="center">
+  <img src="assets\images\zenlife icon.png" width="120" alt="LifeZen Icon">
+</p>
+<p align="center">
+  <img src="https://img.shields.io/badge/Flutter-3.x-blue?logo=flutter" alt="Flutter">
+  <img src="https://img.shields.io/badge/Dart-3.x-blue?logo=dart" alt="Dart">
+  <img src="https://img.shields.io/badge/Android-API%2021%2B-green?logo=android" alt="Android">
+  <img src="https://img.shields.io/github/license/hyklfaiq/LifeZen" alt="License">
+  <img src="https://img.shields.io/github/v/release/hyklfaiq/LifeZen" alt="Latest Release">
+</p>
+
+<p align="center">
+  <strong>A student-focused mobile application for managing daily activities, schedules, well-being, and finances.</strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/hyklfaiq/LifeZen/releases">Download</a>
+  ·
+  <a href="https://github.com/hyklfaiq/LifeZen/issues">Issues</a>
+  ·
+  <a href="https://github.com/hyklfaiq/LifeZen/releases">Releases</a>
+</p>
+
+---
+
+## Table of Contents
+
+* [About](#about)
+* [Features](#features)
+* [Getting Started](#getting-started)
+* [Installation](#installation)
+* [Development Setup](#development-setup)
+* [Building the APK](#building-the-apk)
+* [Project Structure](#project-structure)
+* [Technology](#technology)
+* [Data Storage](#data-storage)
+* [Notifications](#notifications)
+* [i-Ma'luum Integration](#i-maluum-integration)
+* [Releases](#releases)
+* [Current Version](#current-version)
+* [License](#license)
+* [Purpose](#purpose)
+* [Author](#author)
+
+---
+
+## About
 
 LifeZen is a Flutter mobile application designed to help students manage their daily activities, schedules, personal well-being, and finances in one place.
 
@@ -6,79 +53,79 @@ The application combines task planning, timetable management, sleep tracking, ex
 
 ---
 
-## Features
+# Features
 
 ### 📋 Task Planner
 
-- Create and manage daily tasks.
-- Mark tasks as completed.
-- Delete tasks with swipe actions.
-- Assign tasks to specific dates.
-- View tasks directly from the calendar.
-- Receive reminders for upcoming tasks.
+* Create and manage daily tasks.
+* Mark tasks as completed.
+* Delete tasks with swipe actions.
+* Assign tasks to specific dates.
+* View tasks directly from the calendar.
+* Receive reminders for upcoming tasks.
 
 ### 📅 Schedule
 
-- Create weekly recurring schedules.
-- View schedules in a timetable.
-- Manage scheduled activities.
-- Receive notifications for upcoming scheduled activities.
+* Create weekly recurring schedules.
+* View schedules in a timetable.
+* Manage scheduled activities.
+* Receive notifications for upcoming scheduled activities.
 
 ### 🕌 i-Ma'luum Integration
 
-- Import timetable information from i-Ma'luum.
-- Automatically integrate imported schedules into LifeZen.
-- Reduce the need to manually enter recurring academic schedules.
-- Manage imported schedules alongside manually created schedules.
+* Import timetable information from i-Ma'luum.
+* Automatically integrate imported schedules into LifeZen.
+* Reduce the need to manually enter recurring academic schedules.
+* Manage imported schedules alongside manually created schedules.
 
 > i-Ma'luum integration is available in the current version of LifeZen.
 
 ### 😴 Sleep Tracker
 
-- Record sleep and wake times.
-- Automatically calculate sleep duration.
-- View previous sleep records.
-- Track sleep patterns over time.
+* Record sleep and wake times.
+* Automatically calculate sleep duration.
+* View previous sleep records.
+* Track sleep patterns over time.
 
 ### 🎯 Sleep Goal
 
-- Set a personal sleep goal.
-- Choose a goal between 5 and 10 hours.
-- Compare recorded sleep duration with your target.
+* Set a personal sleep goal.
+* Choose a goal between 5 and 10 hours.
+* Compare recorded sleep duration with your target.
 
 ### 💰 Expense Tracker
 
-- Record daily expenses.
-- Categorize expenses.
-- View recent expenses.
-- Delete expenses with swipe actions.
-- Monitor monthly spending.
+* Record daily expenses.
+* Categorize expenses.
+* View recent expenses.
+* Delete expenses with swipe actions.
+* Monitor monthly spending.
 
 ### 💵 Budget
 
-- Set a monthly budget.
-- Automatically calculate a weekly budget.
-- Track spending against your budget.
+* Set a monthly budget.
+* Automatically calculate a weekly budget.
+* Track spending against your budget.
 
 ### 🏦 Savings
 
-- Create a savings goal.
-- Set a target amount.
-- Add money to your savings.
-- Remove money from your savings.
-- Track savings progress.
-- Add an image to a savings goal.
+* Create a savings goal.
+* Set a target amount.
+* Add money to your savings.
+* Remove money from your savings.
+* Track savings progress.
+* Add an image to a savings goal.
 
 ### 🔔 Reminders
 
-- Receive notifications for upcoming tasks.
-- Receive reminders for scheduled activities.
-- Configure reminder timing.
+* Receive notifications for upcoming tasks.
+* Receive reminders for scheduled activities.
+* Configure reminder timing.
 
 ### 🌙 Dark Mode
 
-- Switch between light and dark themes.
-- Theme preference is saved locally.
+* Switch between light and dark themes.
+* Theme preference is saved locally.
 
 ### 💾 Local Storage
 
@@ -92,20 +139,20 @@ No account or online database is required for the core application.
 
 ## Requirements
 
-Before installing or developing LifeZen, make sure you have the following:
+Before installing or developing LifeZen, make sure you have the following.
 
 ### For Android Users
 
-- Android device
-- Android 5.0 (API 21) or higher
-- APK file from the GitHub Releases page
+* Android device
+* Android 5.0 (API 21) or higher
+* APK file from the GitHub Releases page
 
 ### For Development
 
-- Flutter SDK
-- Dart SDK
-- Android Studio or another Flutter-compatible IDE
-- Android device or emulator
+* Flutter SDK
+* Dart SDK
+* Android Studio or another Flutter-compatible IDE
+* Android device or emulator
 
 ---
 
@@ -131,7 +178,7 @@ LifeZen is currently distributed as an Android APK.
 
 If you want to build and run LifeZen from source, follow the steps below.
 
-Clone the repository:
+## Clone the Repository
 
 ```bash
 git clone https://github.com/hyklfaiq/LifeZen.git
@@ -143,35 +190,54 @@ Open the project folder:
 cd LifeZen
 ```
 
-Install the dependencies:
+## Check Flutter Environment
 
-```bash
-flutter pub get
-```
-
-Check Your Flutter Environment
+Run:
 
 ```bash
 flutter doctor
 ```
 
-Connect an Android device or start an emulator, then run:
+Make sure your Flutter environment is properly configured before continuing.
+
+## Install Dependencies
+
+```bash
+flutter pub get
+```
+
+## Run the Application
+
+Connect an Android device or start an Android emulator.
+
+Then run:
 
 ```bash
 flutter run
 ```
 
-Building the APK
+---
+
+# Building the APK
 
 To build a release APK:
+
 ```bash
 flutter build apk --release
 ```
 
 The generated APK can be found at:
-```bash
+
+```text
 build/app/outputs/flutter-apk/app-release.apk
 ```
+
+You can then install the APK on a compatible Android device.
+
+---
+
+# Project Structure
+
 ```text
 LifeZen/
 ├── android/
@@ -212,16 +278,18 @@ LifeZen/
 └── README.md
 ```
 
+---
+
 # Technology
 
 LifeZen is built using:
 
-- [Flutter](https://flutter.dev/)
-- [Dart](https://dart.dev/)
-- [Shared Preferences](https://pub.dev/packages/shared_preferences)
-- [Flutter Local Notifications](https://pub.dev/packages/flutter_local_notifications)
-- [Flutter Timezone](https://pub.dev/packages/flutter_timezone)
-- [Image Picker](https://pub.dev/packages/image_picker)
+* [Flutter](https://flutter.dev/)
+* [Dart](https://dart.dev/)
+* [Shared Preferences](https://pub.dev/packages/shared_preferences)
+* [Flutter Local Notifications](https://pub.dev/packages/flutter_local_notifications)
+* [Flutter Timezone](https://pub.dev/packages/flutter_timezone)
+* [Image Picker](https://pub.dev/packages/image_picker)
 
 ---
 
@@ -231,14 +299,14 @@ LifeZen uses local storage to save application data on the user's device.
 
 Stored data includes:
 
-- Tasks
-- Schedules
-- Sleep records
-- Expenses
-- Monthly budget
-- Savings goals
-- Theme preferences
-- Reminder settings
+* Tasks
+* Schedules
+* Sleep records
+* Expenses
+* Monthly budget
+* Savings goals
+* Theme preferences
+* Reminder settings
 
 The core application does not require an online account or cloud database.
 
@@ -250,9 +318,11 @@ LifeZen uses local notifications to remind users about upcoming activities.
 
 Notifications can be used for:
 
-- Upcoming tasks
-- Scheduled activities
-- Configured reminders
+* Upcoming tasks
+* Scheduled activities
+* Configured reminders
+
+Reminder timing can be configured from the application settings.
 
 ---
 
@@ -266,19 +336,19 @@ Imported schedules can be managed alongside regular LifeZen schedules.
 
 ---
 
+> **Disclaimer:** LifeZen is an independent student project and is **not affiliated with, endorsed by, sponsored by, or officially connected to the International Islamic University Malaysia (IIUM) or i-Ma'luum.** The i-Ma'luum integration is provided solely as a convenience for users and does not represent an official IIUM service.
+
 # Releases
 
-Stable versions of LifeZen are available through the:
-
-[GitHub Releases](https://github.com/hyklfaiq/LifeZen/releases)
+Stable versions of LifeZen are available through the [GitHub Releases](https://github.com/hyklfaiq/LifeZen/releases) page.
 
 Each release may include:
 
-- Android APK
-- Release notes
-- New features
-- Bug fixes
-- Improvements
+* Android APK
+* Release notes
+* New features
+* Bug fixes
+* Improvements
 
 For detailed information about changes in a specific version, see the release notes for that version.
 
@@ -292,19 +362,27 @@ For the latest changes, improvements, and bug fixes, see the [GitHub Releases](h
 
 ---
 
+# License
+
+LifeZen is licensed under the **MIT License**.
+
+See the [LICENSE](LICENSE) file for the full license text.
+
+---
+
 # Purpose
 
 LifeZen was developed as a student-focused mobile application to provide a simple way to organize everyday activities in one place.
 
 The application brings together:
 
-- Daily tasks
-- Academic schedules
-- Sleep tracking
-- Expenses
-- Budgeting
-- Savings
-- Reminders
+* Daily tasks
+* Academic schedules
+* Sleep tracking
+* Expenses
+* Budgeting
+* Savings
+* Reminders
 
 The goal is to provide students with a simple and practical tool for managing their daily routines and personal well-being.
 
@@ -313,3 +391,11 @@ The goal is to provide students with a simple and practical tool for managing th
 # Author
 
 **hyklfaiq**
+
+GitHub: [@hyklfaiq](https://github.com/hyklfaiq)
+
+---
+
+<p align="center">
+  Made with Flutter and Dart
+</p>
