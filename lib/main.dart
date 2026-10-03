@@ -332,7 +332,7 @@ class _MainScreenState extends State<MainScreen> {
       if (!task.completed) {
         try {
           await NotificationService.scheduleTask(
-            id: task.id,
+            id: _taskNotificationId(task.id),
             title: task.title,
             dateTime: task.dueDate,
             reminderMinutes: reminderMinutes,
@@ -362,6 +362,9 @@ class _MainScreenState extends State<MainScreen> {
 
   int _scheduleNotificationId(int scheduleId, int weekday) {
     return (scheduleId % 1000000) * 10 + weekday;
+  }
+  int _taskNotificationId(int taskId) {
+    return 2000000000 + (taskId % 100000000);
   }
 
   Future<void> addSchedule(ScheduleItem item) async {
@@ -549,7 +552,7 @@ class _MainScreenState extends State<MainScreen> {
     tasks.add(newTask);
     await AppStorage.saveTasks(tasks.map((task) => task.toMap()).toList());
     await NotificationService.scheduleTask(
-      id: newTask.id,
+      id: _taskNotificationId(newTask.id),
       title: newTask.title,
       dateTime: newTask.dueDate,
       reminderMinutes: reminderMinutes,
@@ -568,10 +571,10 @@ class _MainScreenState extends State<MainScreen> {
     }
     try {
       if (task.completed) {
-        await NotificationService.cancel(task.id);
+        await NotificationService.cancel(_taskNotificationId(task.id));
       } else {
         await NotificationService.scheduleTask(
-          id: task.id,
+          id: _taskNotificationId(task.id),
           title: task.title,
           dateTime: task.dueDate,
           reminderMinutes: reminderMinutes,
@@ -588,11 +591,25 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Future<void> deleteTask(int taskId) async {
-    tasks.removeWhere((task) => task.id == taskId);
-    await NotificationService.cancel(taskId);
-    await AppStorage.saveTasks(tasks.map((task) => task.toMap()).toList());
-    if (!mounted) return;
-    setState(() {});
+    final index = tasks.indexWhere((task) => task.id == taskId);
+    if (index == -1) return;
+
+    tasks.removeAt(index);
+    if (mounted) {
+      setState(() {});
+    }
+
+    try {
+      await AppStorage.saveTasks(tasks.map((task) => task.toMap()).toList());
+    } catch (e) {
+      debugPrint('Failed to save task deletion: $e');
+    }
+
+    try {
+      await NotificationService.cancel(_taskNotificationId(taskId));
+    } catch (e) {
+      debugPrint('Failed to cancel task notification: $e');
+    }
   }
 
   Future<void> addSleepRecord(SleepRecord record) async {
