@@ -37,6 +37,7 @@
 * [Data Storage](#data-storage)
 * [Notifications](#notifications)
 * [i-Ma'luum Integration](#i-maluum-integration)
+* [Schedule export](#schedule-export)
 * [Releases](#releases)
 * [Current Version](#current-version)
 * [License](#license)
@@ -68,8 +69,14 @@ The application combines task planning, timetable management, sleep tracking, ex
 
 * Create weekly recurring schedules.
 * View schedules in a timetable.
+* Choose between different timetable viewing modes.
+* Use compact schedule viewing for a more condensed timetable.
+* Zoom and drag the timetable to view schedules more easily.
+* Assign custom colors to subjects.
+* View a live current-time indicator across the timetable.
 * Manage scheduled activities.
 * Receive notifications for upcoming scheduled activities.
+* Export schedules in multiple formats.
 
 ### 🕌 i-Ma'luum Integration
 
@@ -337,6 +344,19 @@ Imported schedules can be managed alongside regular LifeZen schedules.
 ---
 
 > **Disclaimer:** LifeZen is an independent student project and is **not affiliated with, endorsed by, sponsored by, or officially connected to the International Islamic University Malaysia (IIUM) or i-Ma'luum.** The i-Ma'luum integration is provided solely as a convenience for users and does not represent an official IIUM service.
+# Schedule Export
+
+LifeZen supports exporting schedule information for use outside the application.
+
+Supported export formats include:
+
+ICS for calendar applications and timetable imports.
+CSV for spreadsheet and data processing applications.
+PNG for sharing or saving a visual copy of the timetable.
+
+Exported schedules contain the relevant timetable information available in LifeZen.
+
+
 
 # Releases
 
