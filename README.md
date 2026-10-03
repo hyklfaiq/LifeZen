@@ -6,7 +6,6 @@
   <img src="https://img.shields.io/badge/Flutter-3.x-blue?logo=flutter" alt="Flutter">
   <img src="https://img.shields.io/badge/Dart-3.x-blue?logo=dart" alt="Dart">
   <img src="https://img.shields.io/badge/Android-API%2021%2B-green?logo=android" alt="Android">
-  <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="MIT License">
   <img src="https://img.shields.io/github/v/release/hyklfaiq/LifeZen" alt="Latest Release">
 </p>
 
