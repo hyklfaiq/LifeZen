@@ -6,10 +6,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import '../services/imaluum/imaluum_timetable.dart';
 
 class ImaluumImportPage extends StatefulWidget {
-  const ImaluumImportPage({
-    super.key,
-    required this.onImport,
-  });
+  const ImaluumImportPage({super.key, required this.onImport});
 
   final Future<int> Function(List<ImaluumMeeting> meetings) onImport;
 
@@ -37,19 +34,21 @@ class _ImaluumImportPageState extends State<ImaluumImportPage> {
         NavigationDelegate(
           onPageStarted: (_) {
             if (mounted) {
-              setState(() => _loading = true);
+              setState(() {
+                _loading = true;
+              });
             }
           },
           onPageFinished: (_) {
             if (mounted) {
-              setState(() => _loading = false);
+              setState(() {
+                _loading = false;
+              });
             }
           },
         ),
       )
-      ..loadRequest(
-        Uri.parse('https://imaluum.iium.edu.my/'),
-      );
+      ..loadRequest(Uri.parse('https://imaluum.iium.edu.my/'));
   }
 
   Future<void> _extract() async {
@@ -57,35 +56,60 @@ class _ImaluumImportPageState extends State<ImaluumImportPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text(
-              'Open Class Timetable or Confirmation Slip before reading it.',
-            ),
+            content: Text('Open Class Timetable before reading it.'),
           ),
         );
       }
+
       return;
     }
 
     if (mounted) {
-      setState(() => _extracting = true);
+      setState(() {
+        _extracting = true;
+      });
     }
 
     try {
       const script = r'''
 (function () {
-  const tables = Array.from(document.querySelectorAll('table'));
+  const tables = Array.from(
+    document.querySelectorAll('table')
+  );
+
   const output = [];
 
-  const semesterMatch = document.body.innerText.match(
+  // Find semester from the page.
+  //
+  // Example text on i-Ma'luum:
+  // "Schedule Sem 1, 2026/2027"
+  //
+  // We only keep:
+  // "Sem 1, 2026/2027"
+  const bodyText = document.body.innerText || '';
+
+  const semesterMatch = bodyText.match(
     /Schedule\s+sem\s+\d+\s*,?\s*\d{4}\s*\/\s*\d{4}/i
   );
 
-  const semester = semesterMatch
-      ? semesterMatch[0].trim()
-      : '';
+  let semester = '';
+
+  if (semesterMatch) {
+    semester = semesterMatch[0]
+      .replace(/^Schedule\s*/i, '')
+      .trim();
+
+    // Make the formatting consistent.
+    semester = semester.replace(
+      /^sem\s+/i,
+      'Sem '
+    );
+  }
 
   for (const table of tables) {
-    const rows = Array.from(table.querySelectorAll('tr'));
+    const rows = Array.from(
+      table.querySelectorAll('tr')
+    );
 
     if (rows.length === 0) {
       continue;
@@ -128,7 +152,11 @@ class _ImaluumImportPageState extends State<ImaluumImportPage> {
 
     const dataRows = [];
 
-    for (let i = headerIndex + 1; i < rows.length; i++) {
+    for (
+      let i = headerIndex + 1;
+      i < rows.length;
+      i++
+    ) {
       const cells = Array.from(
         rows[i].querySelectorAll('td, th')
       );
@@ -144,7 +172,10 @@ class _ImaluumImportPageState extends State<ImaluumImportPage> {
       dataRows.push(values);
     }
 
-    if (headers.length > 0 && dataRows.length > 0) {
+    if (
+      headers.length > 0 &&
+      dataRows.length > 0
+    ) {
       output.push({
         headers: headers,
         rows: dataRows,
@@ -167,7 +198,7 @@ class _ImaluumImportPageState extends State<ImaluumImportPage> {
         try {
           jsonText = jsonDecode(jsonText) as String;
         } catch (_) {
-          // Keep the original value if it was not actually encoded.
+          // Keep original value if it was not actually encoded.
         }
       }
 
@@ -185,7 +216,9 @@ class _ImaluumImportPageState extends State<ImaluumImportPage> {
 
       final meetings = _parser.parseTables(tables);
 
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         _meetings = meetings;
@@ -201,22 +234,23 @@ class _ImaluumImportPageState extends State<ImaluumImportPage> {
         );
       }
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
+          content: const Text(
             'Could not read this timetable. Please open the Class Timetable page and try again.',
           ),
-          action: SnackBarAction(
-            label: 'OK',
-            onPressed: () {},
-          ),
+          action: SnackBarAction(label: 'OK', onPressed: () {}),
         ),
       );
     } finally {
       if (mounted) {
-        setState(() => _extracting = false);
+        setState(() {
+          _extracting = false;
+        });
       }
     }
   }
@@ -224,8 +258,7 @@ class _ImaluumImportPageState extends State<ImaluumImportPage> {
   Future<bool> _isSchedulePage() async {
     final currentUrl = await _controller.currentUrl();
 
-    final path =
-        Uri.tryParse(currentUrl ?? '')?.path.toLowerCase() ?? '';
+    final path = Uri.tryParse(currentUrl ?? '')?.path.toLowerCase() ?? '';
 
     return path.startsWith('/myacademic/schedule') ||
         path.startsWith('/confirmationslip');
@@ -238,7 +271,9 @@ class _ImaluumImportPageState extends State<ImaluumImportPage> {
 
     final added = await widget.onImport(_meetings);
 
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -277,9 +312,7 @@ class _ImaluumImportPageState extends State<ImaluumImportPage> {
           : FloatingActionButton.extended(
               onPressed: _extracting ? null : _import,
               icon: const Icon(Icons.add_task_outlined),
-              label: Text(
-                'Import ${_meetings.length} meetings',
-              ),
+              label: Text('Import ${_meetings.length} meetings'),
             ),
       body: Column(
         children: [
@@ -289,21 +322,17 @@ class _ImaluumImportPageState extends State<ImaluumImportPage> {
             padding: const EdgeInsets.all(12),
             child: const Text(
               'Sign in directly with IIUM and complete any CAPTCHA yourself. '
-              'Open Class Timetable or Confirmation Slip, then tap the '
-              'download button. LifeZen does not read or store your password, '
-              'cookies, or authentication tokens.',
+              'Open Class Timetable, then tap the download button. '
+              'LifeZen does not read or store your password, cookies, '
+              'or authentication tokens.',
             ),
           ),
-          if (_extracting)
-            const LinearProgressIndicator(),
-          Expanded(
-            child: WebViewWidget(
-              controller: _controller,
-            ),
-          ),
+
+          if (_extracting) const LinearProgressIndicator(),
+
+          Expanded(child: WebViewWidget(controller: _controller)),
         ],
       ),
     );
   }
 }
-

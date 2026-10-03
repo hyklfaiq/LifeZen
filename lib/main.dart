@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import 'models/models.dart';
 import 'notification_service.dart';
 import 'pages/health_page.dart';
@@ -12,19 +11,12 @@ import 'storage/app_storage.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
   await NotificationService.init();
-
   runApp(const LifeZenApp());
 }
 
-// ============================================================
-// APP
-// ============================================================
-
 class LifeZenApp extends StatefulWidget {
   const LifeZenApp({super.key});
-
   @override
   State<LifeZenApp> createState() => _LifeZenAppState();
 }
@@ -32,7 +24,6 @@ class LifeZenApp extends StatefulWidget {
 class _LifeZenAppState extends State<LifeZenApp> {
   ThemeMode themeMode = ThemeMode.light;
   bool isStarting = true;
-
   @override
   void initState() {
     super.initState();
@@ -41,17 +32,12 @@ class _LifeZenAppState extends State<LifeZenApp> {
 
   Future<void> _startApp() async {
     final isDark = await AppStorage.loadDarkMode();
-
     if (!mounted) return;
-
     setState(() {
       themeMode = isDark ? ThemeMode.dark : ThemeMode.light;
     });
-
     await Future.delayed(const Duration(seconds: 2));
-
     if (!mounted) return;
-
     setState(() {
       isStarting = false;
     });
@@ -59,11 +45,9 @@ class _LifeZenAppState extends State<LifeZenApp> {
 
   Future<void> toggleTheme() async {
     final newIsDark = themeMode != ThemeMode.dark;
-
     setState(() {
       themeMode = newIsDark ? ThemeMode.dark : ThemeMode.light;
     });
-
     await AppStorage.saveDarkMode(newIsDark);
   }
 
@@ -73,7 +57,6 @@ class _LifeZenAppState extends State<LifeZenApp> {
       seedColor: const Color(0xFF6C7BFF),
       brightness: Brightness.light,
     );
-
     final darkScheme =
         ColorScheme.fromSeed(
           seedColor: const Color(0xFF8B7BFF),
@@ -89,7 +72,6 @@ class _LifeZenAppState extends State<LifeZenApp> {
           outlineVariant: const Color(0xFF475569),
           surfaceContainerHighest: const Color(0xFF1E293B),
         );
-
     return MaterialApp(
       title: 'LifeZen',
       debugShowCheckedModeBanner: false,
@@ -164,18 +146,12 @@ class _LifeZenAppState extends State<LifeZenApp> {
   }
 }
 
-// ============================================================
-// STARTUP SCREEN
-// ============================================================
-
 class StartupScreen extends StatelessWidget {
   const StartupScreen({super.key});
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-
     return DecoratedBox(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -260,41 +236,31 @@ class StartupScreen extends StatelessWidget {
   }
 }
 
-// ============================================================
-// MAIN SCREEN
-// ============================================================
-
 class MainScreen extends StatefulWidget {
   final VoidCallback onToggleTheme;
   final bool isDarkMode;
-
   const MainScreen({
     super.key,
     required this.onToggleTheme,
     required this.isDarkMode,
   });
-
   @override
   State<MainScreen> createState() => _MainScreenState();
 }
 
 class _MainScreenState extends State<MainScreen> {
   final PageController pageController = PageController();
-
   List<Task> tasks = [];
   List<SleepRecord> sleepRecords = [];
   List<Expense> expenses = [];
   List<ScheduleItem> schedule = [];
-
-  SavingsGoal? savingsGoal;
-
+  List<SavingsGoal> savingsGoals = [];
   double monthlyBudget = 800;
   int sleepGoalHours = 8;
   int reminderMinutes = 10;
   int firstDayOfWeek = 1;
   int currentIndex = 0;
   bool isLoading = true;
-
   @override
   void initState() {
     super.initState();
@@ -307,83 +273,54 @@ class _MainScreenState extends State<MainScreen> {
     super.dispose();
   }
 
-  // ==========================================================
-  // SETTINGS
-  // ==========================================================
-
   Future<void> setFirstDayOfWeek(int day) async {
     firstDayOfWeek = day;
-
     if (mounted) {
       setState(() {});
     }
-
     await AppStorage.saveFirstDayOfWeek(day);
   }
 
   Future<void> updateSleepGoal(int hours) async {
     sleepGoalHours = hours;
-
     await AppStorage.saveSleepGoal(hours);
-
     if (!mounted) return;
-
     setState(() {});
   }
 
   Future<void> updateReminderMinutes(int minutes) async {
     reminderMinutes = minutes;
-
     await AppStorage.saveReminderMinutes(minutes);
-
     await _refreshNotifications();
-
     if (!mounted) return;
-
     setState(() {});
   }
-
-  // ==========================================================
-  // LOAD DATA
-  // ==========================================================
 
   Future<void> _loadData() async {
     final loadedTasks = await AppStorage.loadTasks();
     final loadedSleep = await AppStorage.loadSleepRecords();
     final loadedExpenses = await AppStorage.loadExpenses();
     final loadedSchedule = await AppStorage.loadSchedule();
-    final loadedSavings = await AppStorage.loadSavingsGoal();
+    final loadedSavings = await AppStorage.loadSavingsGoals();
     final loadedSleepGoal = await AppStorage.loadSleepGoal();
     final loadedReminderMinutes = await AppStorage.loadReminderMinutes();
     final loadedBudget = await AppStorage.loadBudget();
     final loadedFirstDay = await AppStorage.loadFirstDayOfWeek();
-
     tasks = loadedTasks.map(Task.fromMap).toList();
     sleepRecords = loadedSleep.map(SleepRecord.fromMap).toList();
     expenses = loadedExpenses.map(Expense.fromMap).toList();
     schedule = loadedSchedule.map(ScheduleItem.fromMap).toList();
-
+    savingsGoals = loadedSavings.map(SavingsGoal.fromMap).toList();
     monthlyBudget = loadedBudget;
     firstDayOfWeek = loadedFirstDay;
     sleepGoalHours = loadedSleepGoal;
     reminderMinutes = loadedReminderMinutes;
-
-    if (loadedSavings != null) {
-      savingsGoal = SavingsGoal.fromMap(loadedSavings);
-    }
-
     if (!mounted) return;
-
     setState(() {
       isLoading = false;
     });
-
     await _refreshNotifications();
   }
-
-  // ==========================================================
-  // NOTIFICATIONS
-  // ==========================================================
 
   Future<void> _refreshNotifications() async {
     try {
@@ -391,7 +328,6 @@ class _MainScreenState extends State<MainScreen> {
     } catch (e) {
       debugPrint('Failed to clear notifications: $e');
     }
-
     for (final task in tasks) {
       if (!task.completed) {
         try {
@@ -406,7 +342,6 @@ class _MainScreenState extends State<MainScreen> {
         }
       }
     }
-
     for (final item in schedule) {
       for (final day in item.repeatDays) {
         try {
@@ -429,10 +364,6 @@ class _MainScreenState extends State<MainScreen> {
     return (scheduleId % 1000000) * 10 + weekday;
   }
 
-  // ==========================================================
-  // SCHEDULE
-  // ==========================================================
-
   Future<void> addSchedule(ScheduleItem item) async {
     final newItem = ScheduleItem(
       id: DateTime.now().millisecondsSinceEpoch,
@@ -441,17 +372,13 @@ class _MainScreenState extends State<MainScreen> {
       endTime: item.endTime,
       repeatDays: List<int>.from(item.repeatDays),
     );
-
     schedule.add(newItem);
-
     if (mounted) {
       setState(() {});
     }
-
     await AppStorage.saveSchedule(
       schedule.map((item) => item.toMap()).toList(),
     );
-
     for (final day in newItem.repeatDays) {
       try {
         await NotificationService.scheduleWeekly(
@@ -472,9 +399,7 @@ class _MainScreenState extends State<MainScreen> {
     final existingKeys = schedule
         .map((item) => item.importKey)
         .whereType<String>();
-
     final added = <ScheduleItem>[];
-
     for (final meeting in excludeImportedMeetings(meetings, existingKeys)) {
       final details = [
         meeting.courseCode,
@@ -482,7 +407,6 @@ class _MainScreenState extends State<MainScreen> {
         if (meeting.section != null) 'Section ${meeting.section}',
         if (meeting.venue != null) meeting.venue!,
       ];
-
       added.add(
         ScheduleItem(
           id: DateTime.now().microsecondsSinceEpoch + added.length,
@@ -500,19 +424,14 @@ class _MainScreenState extends State<MainScreen> {
         ),
       );
     }
-
     if (added.isEmpty) return 0;
-
     schedule.addAll(added);
-
     if (mounted) {
       setState(() {});
     }
-
     await AppStorage.saveSchedule(
       schedule.map((item) => item.toMap()).toList(),
     );
-
     for (final item in added) {
       for (final day in item.repeatDays) {
         try {
@@ -529,18 +448,13 @@ class _MainScreenState extends State<MainScreen> {
         }
       }
     }
-
     return added.length;
   }
 
   Future<void> updateSchedule(ScheduleItem updatedItem) async {
     final index = schedule.indexWhere((item) => item.id == updatedItem.id);
-
     if (index == -1) return;
-
     final oldItem = schedule[index];
-
-    // Cancel old notifications
     for (final day in oldItem.repeatDays) {
       try {
         await NotificationService.cancel(
@@ -550,7 +464,6 @@ class _MainScreenState extends State<MainScreen> {
         debugPrint('Failed to cancel old notification: $e');
       }
     }
-
     schedule[index] = ScheduleItem(
       id: updatedItem.id,
       title: updatedItem.title,
@@ -565,15 +478,12 @@ class _MainScreenState extends State<MainScreen> {
       section: oldItem.section,
       semester: oldItem.semester,
     );
-
     if (mounted) {
       setState(() {});
     }
-
     await AppStorage.saveSchedule(
       schedule.map((item) => item.toMap()).toList(),
     );
-
     for (final day in updatedItem.repeatDays) {
       try {
         await NotificationService.scheduleWeekly(
@@ -592,12 +502,8 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<void> deleteSchedule(int id) async {
     final index = schedule.indexWhere((item) => item.id == id);
-
     if (index == -1) return;
-
     final item = schedule[index];
-
-    // Cancel notifications
     for (final day in item.repeatDays) {
       try {
         await NotificationService.cancel(_scheduleNotificationId(item.id, day));
@@ -605,26 +511,17 @@ class _MainScreenState extends State<MainScreen> {
         debugPrint('Failed to cancel schedule notification: $e');
       }
     }
-
     schedule.removeAt(index);
-
     if (mounted) {
       setState(() {});
     }
-
     await AppStorage.saveSchedule(
       schedule.map((item) => item.toMap()).toList(),
     );
   }
 
-  // ==========================================================
-  // CLEAR ALL SCHEDULES
-  // ==========================================================
-
   Future<void> clearAllSchedules() async {
     if (schedule.isEmpty) return;
-
-    // Cancel all schedule notifications
     for (final item in schedule) {
       for (final day in item.repeatDays) {
         try {
@@ -636,21 +533,11 @@ class _MainScreenState extends State<MainScreen> {
         }
       }
     }
-
-    // Clear schedules from memory
     schedule.clear();
-
-    // Save empty schedule list
     await AppStorage.saveSchedule([]);
-
     if (!mounted) return;
-
     setState(() {});
   }
-
-  // ==========================================================
-  // TASKS
-  // ==========================================================
 
   Future<void> addTask(Task task) async {
     final newTask = Task(
@@ -659,42 +546,26 @@ class _MainScreenState extends State<MainScreen> {
       dueDate: task.dueDate,
       completed: false,
     );
-
     tasks.add(newTask);
-
     await AppStorage.saveTasks(tasks.map((task) => task.toMap()).toList());
-
     await NotificationService.scheduleTask(
       id: newTask.id,
       title: newTask.title,
       dateTime: newTask.dueDate,
       reminderMinutes: reminderMinutes,
     );
-
     if (!mounted) return;
-
     setState(() {});
   }
 
- Future<void> toggleTask(int taskId) async {
+  Future<void> toggleTask(int taskId) async {
     final index = tasks.indexWhere((task) => task.id == taskId);
-
     if (index == -1) return;
-
     final task = tasks[index];
-
-    // Update the task immediately.
     task.completed = !task.completed;
-
-    // IMPORTANT:
-    // Rebuild the UI immediately.
-    // This makes the Planner checkbox and strikethrough
-    // update without leaving the page.
     if (mounted) {
       setState(() {});
     }
-
-    // Handle notification after UI has already updated.
     try {
       if (task.completed) {
         await NotificationService.cancel(task.id);
@@ -709,8 +580,6 @@ class _MainScreenState extends State<MainScreen> {
     } catch (e) {
       debugPrint('Failed to update task notification: $e');
     }
-
-    // Save the new completed state.
     try {
       await AppStorage.saveTasks(tasks.map((task) => task.toMap()).toList());
     } catch (e) {
@@ -720,19 +589,11 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<void> deleteTask(int taskId) async {
     tasks.removeWhere((task) => task.id == taskId);
-
     await NotificationService.cancel(taskId);
-
     await AppStorage.saveTasks(tasks.map((task) => task.toMap()).toList());
-
     if (!mounted) return;
-
     setState(() {});
   }
-
-  // ==========================================================
-  // SLEEP
-  // ==========================================================
 
   Future<void> addSleepRecord(SleepRecord record) async {
     final newRecord = SleepRecord(
@@ -741,33 +602,22 @@ class _MainScreenState extends State<MainScreen> {
       wakeTime: record.wakeTime,
       note: record.note,
     );
-
     sleepRecords.insert(0, newRecord);
-
     await AppStorage.saveSleepRecords(
       sleepRecords.map((record) => record.toMap()).toList(),
     );
-
     if (!mounted) return;
-
     setState(() {});
   }
 
   Future<void> deleteSleepRecord(int recordId) async {
     sleepRecords.removeWhere((record) => record.id == recordId);
-
     await AppStorage.saveSleepRecords(
       sleepRecords.map((record) => record.toMap()).toList(),
     );
-
     if (!mounted) return;
-
     setState(() {});
   }
-
-  // ==========================================================
-  // EXPENSES
-  // ==========================================================
 
   Future<void> addExpense(Expense expense) async {
     final newExpense = Expense(
@@ -777,166 +627,138 @@ class _MainScreenState extends State<MainScreen> {
       category: expense.category,
       date: expense.date,
     );
-
     expenses.insert(0, newExpense);
-
     await AppStorage.saveExpenses(
       expenses.map((expense) => expense.toMap()).toList(),
     );
-
     if (!mounted) return;
-
     setState(() {});
   }
 
   Future<void> deleteExpense(int expenseId) async {
     expenses.removeWhere((expense) => expense.id == expenseId);
-
     await AppStorage.saveExpenses(
       expenses.map((expense) => expense.toMap()).toList(),
     );
-
     if (!mounted) return;
-
     setState(() {});
   }
-
-  // ==========================================================
-  // BUDGET
-  // ==========================================================
 
   Future<void> updateBudget(double amount) async {
     monthlyBudget = amount;
-
     await AppStorage.saveBudget(amount);
-
     if (!mounted) return;
-
     setState(() {});
   }
-
-  // ==========================================================
-  // SAVINGS
-  // ==========================================================
 
   Future<void> saveSavingsGoal({
     required String name,
     required double targetAmount,
     String? imagePath,
   }) async {
-    savingsGoal = SavingsGoal(
+    final newGoal = SavingsGoal(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
       name: name,
       targetAmount: targetAmount,
       currentAmount: 0,
       imagePath: imagePath,
     );
-
-    await AppStorage.saveSavingsGoal(savingsGoal!.toMap());
-
+    savingsGoals.add(newGoal);
+    await AppStorage.saveSavingsGoals(
+      savingsGoals.map((goal) => goal.toMap()).toList(),
+    );
     if (!mounted) return;
-
     setState(() {});
   }
 
   Future<void> editSavingsGoal({
+    required String id,
     required String name,
     required double targetAmount,
     String? imagePath,
   }) async {
-    if (savingsGoal == null) return;
-
-    savingsGoal!
+    final index = savingsGoals.indexWhere((goal) => goal.id == id);
+    if (index == -1) return;
+    final goal = savingsGoals[index];
+    goal
       ..name = name
       ..targetAmount = targetAmount;
-
     if (imagePath != null) {
-      savingsGoal!.imagePath = imagePath;
+      goal.imagePath = imagePath;
     }
-
-    if (savingsGoal!.currentAmount > targetAmount) {
-      savingsGoal!.currentAmount = targetAmount;
+    if (goal.currentAmount > targetAmount) {
+      goal.currentAmount = targetAmount;
     }
-
-    await AppStorage.saveSavingsGoal(savingsGoal!.toMap());
-
+    await AppStorage.saveSavingsGoals(
+      savingsGoals.map((goal) => goal.toMap()).toList(),
+    );
     if (!mounted) return;
-
     setState(() {});
   }
 
-  Future<void> addSavings(double amount) async {
-    if (savingsGoal == null) return;
-
-    savingsGoal!.currentAmount += amount;
-
-    if (savingsGoal!.currentAmount > savingsGoal!.targetAmount) {
-      savingsGoal!.currentAmount = savingsGoal!.targetAmount;
+  Future<void> addSavings(String id, double amount) async {
+    final index = savingsGoals.indexWhere((goal) => goal.id == id);
+    if (index == -1) return;
+    final goal = savingsGoals[index];
+    goal.currentAmount += amount;
+    if (goal.currentAmount > goal.targetAmount) {
+      goal.currentAmount = goal.targetAmount;
     }
-
-    await AppStorage.saveSavingsGoal(savingsGoal!.toMap());
-
+    await AppStorage.saveSavingsGoals(
+      savingsGoals.map((goal) => goal.toMap()).toList(),
+    );
     if (!mounted) return;
-
     setState(() {});
   }
 
-  Future<void> removeSavings(double amount) async {
-    if (savingsGoal == null) return;
-
-    savingsGoal!.currentAmount -= amount;
-
-    if (savingsGoal!.currentAmount < 0) {
-      savingsGoal!.currentAmount = 0;
+  Future<void> removeSavings(String id, double amount) async {
+    final index = savingsGoals.indexWhere((goal) => goal.id == id);
+    if (index == -1) return;
+    final goal = savingsGoals[index];
+    goal.currentAmount -= amount;
+    if (goal.currentAmount < 0) {
+      goal.currentAmount = 0;
     }
-
-    await AppStorage.saveSavingsGoal(savingsGoal!.toMap());
-
+    await AppStorage.saveSavingsGoals(
+      savingsGoals.map((goal) => goal.toMap()).toList(),
+    );
     if (!mounted) return;
-
     setState(() {});
   }
 
-  Future<void> deleteSavingsGoal() async {
-    savingsGoal = null;
-
-    await AppStorage.clearSavingsGoal();
-
+  Future<void> deleteSavingsGoal(String id) async {
+    savingsGoals.removeWhere((goal) => goal.id == id);
+    await AppStorage.saveSavingsGoals(
+      savingsGoals.map((goal) => goal.toMap()).toList(),
+    );
     if (!mounted) return;
-
     setState(() {});
   }
-
-  // ==========================================================
-  // BUILD
-  // ==========================================================
 
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-
     final pages = [
       HomePage(
         schedule: schedule,
         tasks: tasks,
         sleepRecords: sleepRecords,
         expenses: expenses,
-        savingsGoal: savingsGoal,
+        savingsGoal: savingsGoals.isEmpty ? null : savingsGoals.first,
         onToggleTask: toggleTask,
         isDarkMode: widget.isDarkMode,
         onToggleTheme: widget.onToggleTheme,
         reminderMinutes: reminderMinutes,
         onReminderMinutesChanged: updateReminderMinutes,
       ),
-
       PlannerPage(
         tasks: tasks,
         onAddTask: addTask,
         onToggleTask: toggleTask,
         onDeleteTask: deleteTask,
       ),
-
       SchedulePage(
         schedule: schedule,
         firstDayOfWeek: firstDayOfWeek,
@@ -945,11 +767,8 @@ class _MainScreenState extends State<MainScreen> {
         onUpdateSchedule: updateSchedule,
         onDeleteSchedule: deleteSchedule,
         onImportImaluum: importImaluumSchedule,
-
-        // NEW
         onClearAll: clearAllSchedules,
       ),
-
       HealthPage(
         sleepRecords: sleepRecords,
         sleepGoalHours: sleepGoalHours,
@@ -957,11 +776,10 @@ class _MainScreenState extends State<MainScreen> {
         onDeleteSleep: deleteSleepRecord,
         onUpdateSleepGoal: updateSleepGoal,
       ),
-
       MoneyPage(
         expenses: expenses,
         monthlyBudget: monthlyBudget,
-        savingsGoal: savingsGoal,
+        savingsGoals: savingsGoals,
         onAddExpense: addExpense,
         onDeleteExpense: deleteExpense,
         onUpdateBudget: updateBudget,
@@ -972,7 +790,6 @@ class _MainScreenState extends State<MainScreen> {
         onDeleteSavings: deleteSavingsGoal,
       ),
     ];
-
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: PageView(
@@ -988,7 +805,6 @@ class _MainScreenState extends State<MainScreen> {
             setState(() {
               currentIndex = index;
             });
-
             pageController.animateToPage(
               index,
               duration: const Duration(milliseconds: 350),

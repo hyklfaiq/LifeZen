@@ -4,11 +4,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class AppStorage {
   static const String _themeKey = 'theme_mode';
-
   static const String _tasksKey = 'tasks';
   static const String _sleepKey = 'sleep_records';
   static const String _expensesKey = 'expenses';
-  static const String _savingsKey = 'savings_goal';
+
+  // Multiple savings goals
+  static const String _savingsGoalsKey = 'savings_goals';
+
   static const String _budgetKey = 'monthly_budget';
   static const String _scheduleKey = 'schedule';
   static const String _firstDayKey = 'first_day_of_week';
@@ -19,7 +21,9 @@ class AppStorage {
     return SharedPreferences.getInstance();
   }
 
+  // ============================================================
   // THEME
+  // ============================================================
 
   static Future<void> saveDarkMode(bool isDark) async {
     final prefs = await _prefs();
@@ -31,7 +35,9 @@ class AppStorage {
     return prefs.getBool(_themeKey) ?? false;
   }
 
+  // ============================================================
   // TASKS
+  // ============================================================
 
   static Future<void> saveTasks(List<Map<String, dynamic>> tasks) async {
     final prefs = await _prefs();
@@ -53,7 +59,9 @@ class AppStorage {
     );
   }
 
+  // ============================================================
   // SLEEP
+  // ============================================================
 
   static Future<void> saveSleepRecords(
     List<Map<String, dynamic>> records,
@@ -77,7 +85,9 @@ class AppStorage {
     );
   }
 
+  // ============================================================
   // SLEEP GOAL
+  // ============================================================
 
   static Future<void> saveSleepGoal(int hours) async {
     final prefs = await _prefs();
@@ -89,7 +99,9 @@ class AppStorage {
     return prefs.getInt(_sleepGoalKey) ?? 8;
   }
 
+  // ============================================================
   // REMINDER LEAD TIME
+  // ============================================================
 
   static Future<void> saveReminderMinutes(int minutes) async {
     final prefs = await _prefs();
@@ -101,7 +113,9 @@ class AppStorage {
     return prefs.getInt(_reminderMinutesKey) ?? 10;
   }
 
+  // ============================================================
   // EXPENSES
+  // ============================================================
 
   static Future<void> saveExpenses(List<Map<String, dynamic>> expenses) async {
     final prefs = await _prefs();
@@ -123,30 +137,38 @@ class AppStorage {
     );
   }
 
-  // SAVINGS
+  // ============================================================
+  // SAVINGS GOALS
+  // ============================================================
 
-  static Future<void> saveSavingsGoal(Map<String, dynamic> goal) async {
+  static Future<void> saveSavingsGoals(List<Map<String, dynamic>> goals) async {
     final prefs = await _prefs();
-    await prefs.setString(_savingsKey, jsonEncode(goal));
+    await prefs.setString(_savingsGoalsKey, jsonEncode(goals));
   }
 
-  static Future<Map<String, dynamic>?> loadSavingsGoal() async {
+  static Future<List<Map<String, dynamic>>> loadSavingsGoals() async {
     final prefs = await _prefs();
-    final data = prefs.getString(_savingsKey);
+    final data = prefs.getString(_savingsGoalsKey);
 
     if (data == null || data.isEmpty) {
-      return null;
+      return [];
     }
 
-    return Map<String, dynamic>.from(jsonDecode(data));
+    final decoded = jsonDecode(data);
+
+    return List<Map<String, dynamic>>.from(
+      (decoded as List).map((item) => Map<String, dynamic>.from(item)),
+    );
   }
 
-  static Future<void> clearSavingsGoal() async {
+  static Future<void> clearSavingsGoals() async {
     final prefs = await _prefs();
-    await prefs.remove(_savingsKey);
+    await prefs.remove(_savingsGoalsKey);
   }
 
+  // ============================================================
   // BUDGET
+  // ============================================================
 
   static Future<void> saveBudget(double budget) async {
     final prefs = await _prefs();
@@ -158,7 +180,9 @@ class AppStorage {
     return prefs.getDouble(_budgetKey) ?? 800.0;
   }
 
+  // ============================================================
   // SCHEDULE
+  // ============================================================
 
   static Future<void> saveSchedule(List<Map<String, dynamic>> schedule) async {
     final prefs = await _prefs();
@@ -180,7 +204,9 @@ class AppStorage {
     );
   }
 
+  // ============================================================
   // FIRST DAY OF WEEK
+  // ============================================================
 
   static Future<void> saveFirstDayOfWeek(int day) async {
     final prefs = await _prefs();

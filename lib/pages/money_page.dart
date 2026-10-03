@@ -9,12 +9,15 @@ import '../utils/app_helpers.dart';
 class MoneyPage extends StatelessWidget {
   final List<Expense> expenses;
   final double monthlyBudget;
-  final SavingsGoal? savingsGoal;
+
+  // Multiple savings goals
+  final List<SavingsGoal> savingsGoals;
 
   final Function(Expense) onAddExpense;
   final Function(int) onDeleteExpense;
   final Function(double) onUpdateBudget;
 
+  // Create a new savings goal
   final Future<void> Function({
     required String name,
     required double targetAmount,
@@ -22,22 +25,27 @@ class MoneyPage extends StatelessWidget {
   })
   onCreateSavings;
 
+  // Edit an existing savings goal
   final Future<void> Function({
+    required String id,
     required String name,
     required double targetAmount,
     String? imagePath,
   })
   onEditSavings;
 
-  final Function(double) onAddSavings;
-  final Function(double) onRemoveSavings;
-  final Function() onDeleteSavings;
+  // Add/remove money from a specific goal
+  final Future<void> Function(String id, double amount) onAddSavings;
+  final Future<void> Function(String id, double amount) onRemoveSavings;
+
+  // Delete a specific goal
+  final Future<void> Function(String id) onDeleteSavings;
 
   const MoneyPage({
     super.key,
     required this.expenses,
     required this.monthlyBudget,
-    required this.savingsGoal,
+    required this.savingsGoals,
     required this.onAddExpense,
     required this.onDeleteExpense,
     required this.onUpdateBudget,
@@ -68,6 +76,9 @@ class MoneyPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ============================================================
+            // HEADER
+            // ============================================================
             Row(
               children: [
                 const Text(
@@ -85,6 +96,9 @@ class MoneyPage extends StatelessWidget {
 
             const SizedBox(height: 24),
 
+            // ============================================================
+            // MONTHLY SPENDING
+            // ============================================================
             Card(
               elevation: 0,
               child: Padding(
@@ -144,6 +158,9 @@ class MoneyPage extends StatelessWidget {
 
             const SizedBox(height: 12),
 
+            // ============================================================
+            // WEEKLY BUDGET
+            // ============================================================
             Card(
               elevation: 0,
               child: ListTile(
@@ -162,6 +179,9 @@ class MoneyPage extends StatelessWidget {
 
             const SizedBox(height: 24),
 
+            // ============================================================
+            // RECENT EXPENSES
+            // ============================================================
             Row(
               children: [
                 const Text(
@@ -230,22 +250,47 @@ class MoneyPage extends StatelessWidget {
 
             const SizedBox(height: 24),
 
-            const Text(
-              'Savings',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            // ============================================================
+            // SAVINGS HEADER
+            // ============================================================
+            Row(
+              children: [
+                const Text(
+                  'Savings',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const Spacer(),
+                IconButton(
+                  onPressed: () => showCreateSavingsDialog(context),
+                  icon: const Icon(Icons.add),
+                  tooltip: 'Add savings goal',
+                ),
+              ],
             ),
 
             const SizedBox(height: 12),
 
-            if (savingsGoal == null)
+            // ============================================================
+            // SAVINGS GOALS
+            // ============================================================
+            if (savingsGoals.isEmpty)
               _buildEmptySavings(context)
             else
-              _buildSavingsCard(context),
+              ...savingsGoals.map(
+                (goal) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _buildSavingsCard(context, goal),
+                ),
+              ),
           ],
         ),
       ),
     );
   }
+
+  // ================================================================
+  // EMPTY SAVINGS
+  // ================================================================
 
   Widget _buildEmptySavings(BuildContext context) {
     return Card(
@@ -258,7 +303,7 @@ class MoneyPage extends StatelessWidget {
             const Icon(Icons.savings_outlined, size: 36),
             const SizedBox(height: 12),
             const Text(
-              'No savings goal yet.',
+              'No savings goals yet.',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 6),
@@ -278,9 +323,11 @@ class MoneyPage extends StatelessWidget {
     );
   }
 
-  Widget _buildSavingsCard(BuildContext context) {
-    final goal = savingsGoal!;
+  // ================================================================
+  // SAVINGS CARD
+  // ================================================================
 
+  Widget _buildSavingsCard(BuildContext context, SavingsGoal goal) {
     return Card(
       elevation: 0,
       child: Padding(
@@ -288,6 +335,9 @@ class MoneyPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ------------------------------------------------------------
+            // Goal header
+            // ------------------------------------------------------------
             Row(
               children: [
                 CircleAvatar(
@@ -315,11 +365,11 @@ class MoneyPage extends StatelessWidget {
                 PopupMenuButton<String>(
                   onSelected: (value) {
                     if (value == 'edit') {
-                      showEditSavingsDialog(context);
+                      showEditSavingsDialog(context, goal);
                     }
 
                     if (value == 'delete') {
-                      showDeleteSavingsDialog(context);
+                      showDeleteSavingsDialog(context, goal);
                     }
                   },
                   itemBuilder: (context) => const [
@@ -332,6 +382,9 @@ class MoneyPage extends StatelessWidget {
 
             const SizedBox(height: 14),
 
+            // ------------------------------------------------------------
+            // Progress
+            // ------------------------------------------------------------
             Row(
               children: [
                 Expanded(
@@ -358,19 +411,24 @@ class MoneyPage extends StatelessWidget {
 
             const SizedBox(height: 16),
 
+            // ------------------------------------------------------------
+            // Add / Remove
+            // ------------------------------------------------------------
             Row(
               children: [
                 Expanded(
                   child: FilledButton.icon(
-                    onPressed: () => showAddSavingsDialog(context),
+                    onPressed: () => showAddSavingsDialog(context, goal),
                     icon: const Icon(Icons.add),
                     label: const Text('Add'),
                   ),
                 ),
+
                 const SizedBox(width: 8),
+
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () => showRemoveSavingsDialog(context),
+                    onPressed: () => showRemoveSavingsDialog(context, goal),
                     icon: const Icon(Icons.remove),
                     label: const Text('Remove'),
                   ),
@@ -383,6 +441,10 @@ class MoneyPage extends StatelessWidget {
     );
   }
 
+  // ================================================================
+  // EMPTY CARD
+  // ================================================================
+
   Widget _emptyCard(String text) {
     return Card(
       elevation: 0,
@@ -392,6 +454,10 @@ class MoneyPage extends StatelessWidget {
       ),
     );
   }
+
+  // ================================================================
+  // DELETE BACKGROUND
+  // ================================================================
 
   Widget _deleteBackground() {
     return Container(
@@ -406,9 +472,9 @@ class MoneyPage extends StatelessWidget {
     );
   }
 
-  // ---------------------------------------------------------------------------
+  // ================================================================
   // ADD EXPENSE
-  // ---------------------------------------------------------------------------
+  // ================================================================
 
   Future<void> showAddExpenseDialog(BuildContext context) async {
     final result = await showDialog<Expense>(
@@ -421,9 +487,9 @@ class MoneyPage extends StatelessWidget {
     }
   }
 
-  // ---------------------------------------------------------------------------
+  // ================================================================
   // BUDGET
-  // ---------------------------------------------------------------------------
+  // ================================================================
 
   Future<void> showBudgetDialog(BuildContext context) async {
     final result = await showDialog<double>(
@@ -436,9 +502,9 @@ class MoneyPage extends StatelessWidget {
     }
   }
 
-  // ---------------------------------------------------------------------------
+  // ================================================================
   // CREATE SAVINGS
-  // ---------------------------------------------------------------------------
+  // ================================================================
 
   Future<void> showCreateSavingsDialog(BuildContext context) async {
     final result = await showDialog<_SavingsDialogResult>(
@@ -458,15 +524,14 @@ class MoneyPage extends StatelessWidget {
     );
   }
 
-  // ---------------------------------------------------------------------------
+  // ================================================================
   // EDIT SAVINGS
-  // ---------------------------------------------------------------------------
+  // ================================================================
 
-  Future<void> showEditSavingsDialog(BuildContext context) async {
-    final goal = savingsGoal;
-
-    if (goal == null) return;
-
+  Future<void> showEditSavingsDialog(
+    BuildContext context,
+    SavingsGoal goal,
+  ) async {
     final result = await showDialog<_SavingsDialogResult>(
       context: context,
       builder: (_) => _SavingsDialog(
@@ -481,17 +546,21 @@ class MoneyPage extends StatelessWidget {
     if (result == null) return;
 
     await onEditSavings(
+      id: goal.id,
       name: result.name,
       targetAmount: result.targetAmount,
       imagePath: result.imagePath,
     );
   }
 
-  // ---------------------------------------------------------------------------
+  // ================================================================
   // ADD SAVINGS
-  // ---------------------------------------------------------------------------
+  // ================================================================
 
-  Future<void> showAddSavingsDialog(BuildContext context) async {
+  Future<void> showAddSavingsDialog(
+    BuildContext context,
+    SavingsGoal goal,
+  ) async {
     final result = await showDialog<double>(
       context: context,
       builder: (_) =>
@@ -499,15 +568,18 @@ class MoneyPage extends StatelessWidget {
     );
 
     if (result != null) {
-      onAddSavings(result);
+      await onAddSavings(goal.id, result);
     }
   }
 
-  // ---------------------------------------------------------------------------
+  // ================================================================
   // REMOVE SAVINGS
-  // ---------------------------------------------------------------------------
+  // ================================================================
 
-  Future<void> showRemoveSavingsDialog(BuildContext context) async {
+  Future<void> showRemoveSavingsDialog(
+    BuildContext context,
+    SavingsGoal goal,
+  ) async {
     final result = await showDialog<double>(
       context: context,
       builder: (_) => const _SavingsAmountDialog(
@@ -517,23 +589,24 @@ class MoneyPage extends StatelessWidget {
     );
 
     if (result != null) {
-      onRemoveSavings(result);
+      await onRemoveSavings(goal.id, result);
     }
   }
 
-  // ---------------------------------------------------------------------------
+  // ================================================================
   // DELETE SAVINGS
-  // ---------------------------------------------------------------------------
+  // ================================================================
 
-  Future<void> showDeleteSavingsDialog(BuildContext context) async {
+  Future<void> showDeleteSavingsDialog(
+    BuildContext context,
+    SavingsGoal goal,
+  ) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
           title: const Text('Delete savings goal?'),
-          content: const Text(
-            'This will remove the goal and its saved progress.',
-          ),
+          content: Text('Delete "${goal.name}" and its saved progress?'),
           actions: [
             TextButton(
               onPressed: () {
@@ -553,14 +626,14 @@ class MoneyPage extends StatelessWidget {
     );
 
     if (confirmed == true) {
-      onDeleteSavings();
+      await onDeleteSavings(goal.id);
     }
   }
 }
 
-// =============================================================================
+// ============================================================================
 // ADD EXPENSE DIALOG
-// =============================================================================
+// ============================================================================
 
 class _AddExpenseDialog extends StatefulWidget {
   const _AddExpenseDialog();
@@ -587,11 +660,13 @@ class _AddExpenseDialogState extends State<_AddExpenseDialog> {
   void dispose() {
     _titleController.dispose();
     _amountController.dispose();
+
     super.dispose();
   }
 
   void _submit() {
     final title = _titleController.text.trim();
+
     final amount = double.tryParse(_amountController.text.trim());
 
     if (title.isEmpty || amount == null || amount <= 0) {
@@ -681,9 +756,9 @@ class _AddExpenseDialogState extends State<_AddExpenseDialog> {
   }
 }
 
-// =============================================================================
+// ============================================================================
 // BUDGET DIALOG
-// =============================================================================
+// ============================================================================
 
 class _BudgetDialog extends StatefulWidget {
   const _BudgetDialog({required this.initialBudget});
@@ -709,6 +784,7 @@ class _BudgetDialogState extends State<_BudgetDialog> {
   @override
   void dispose() {
     _controller.dispose();
+
     super.dispose();
   }
 
@@ -748,9 +824,9 @@ class _BudgetDialogState extends State<_BudgetDialog> {
   }
 }
 
-// =============================================================================
+// ============================================================================
 // SAVINGS GOAL RESULT
-// =============================================================================
+// ============================================================================
 
 class _SavingsDialogResult {
   final String name;
@@ -764,9 +840,9 @@ class _SavingsDialogResult {
   });
 }
 
-// =============================================================================
+// ============================================================================
 // CREATE / EDIT SAVINGS DIALOG
-// =============================================================================
+// ============================================================================
 
 class _SavingsDialog extends StatefulWidget {
   const _SavingsDialog({
@@ -779,7 +855,6 @@ class _SavingsDialog extends StatefulWidget {
 
   final String title;
   final String buttonText;
-
   final String initialName;
   final double? initialTarget;
   final String? initialImagePath;
@@ -811,6 +886,7 @@ class _SavingsDialogState extends State<_SavingsDialog> {
   void dispose() {
     _nameController.dispose();
     _targetController.dispose();
+
     super.dispose();
   }
 
@@ -872,7 +948,6 @@ class _SavingsDialogState extends State<_SavingsDialog> {
                           ? const Icon(Icons.add_a_photo_outlined, size: 28)
                           : null,
                     ),
-
                     Positioned(
                       right: 0,
                       bottom: 0,
@@ -946,9 +1021,9 @@ class _SavingsDialogState extends State<_SavingsDialog> {
   }
 }
 
-// =============================================================================
+// ============================================================================
 // ADD / REMOVE SAVINGS AMOUNT DIALOG
-// =============================================================================
+// ============================================================================
 
 class _SavingsAmountDialog extends StatefulWidget {
   const _SavingsAmountDialog({required this.title, required this.buttonText});
@@ -973,6 +1048,7 @@ class _SavingsAmountDialogState extends State<_SavingsAmountDialog> {
   @override
   void dispose() {
     _controller.dispose();
+
     super.dispose();
   }
 
