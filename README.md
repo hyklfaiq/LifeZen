@@ -361,7 +361,6 @@ PNG for sharing or saving a visual copy of the timetable.
 Exported schedules contain the relevant timetable information available in LifeZen.
 
 
-
 # Releases
 
 Stable versions of LifeZen are available through the [GitHub Releases](https://github.com/hyklfaiq/LifeZen/releases) page.
@@ -386,11 +385,14 @@ For the latest changes, improvements, and bug fixes, see the [GitHub Releases](h
 
 ---
 
+---
+
 # License
 
-LifeZen is licensed under the **MIT License**.
-
-See the [LICENSE](LICENSE) file for the full license text.
+LifeZen is publicly available for portfolio and educational purposes.
+All rights reserved. No permission is granted to copy, modify,
+distribute, or use this software commercially without prior written
+permission.
 
 ---
 
