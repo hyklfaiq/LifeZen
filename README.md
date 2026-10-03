@@ -250,34 +250,39 @@ LifeZen/
 ├── android/
 ├── ios/
 ├── lib/
-│   ├── main.dart
-│   │
-│   ├── models/
-│   │   ├── expense.dart
-│   │   ├── models.dart
-│   │   ├── savings_goal.dart
-│   │   ├── schedule_item.dart
-│   │   ├── sleep_record.dart
-│   │   └── task.dart
-│   │
-│   ├── pages/
-│   │   ├── health_page.dart
-│   │   ├── home_page.dart
-│   │   ├── money_page.dart
-│   │   ├── planner_page.dart
-│   │   └── schedule_page.dart
-│   │
-│   ├── services/
-│   │   └── imaluum/
-│   │       └── imaluum_timetable.dart
-│   │
-│   ├── utils/
-│   │   └── app_helpers.dart
-│   │
-│   ├── notification_service.dart
-│   │
-│   └── storage/
-│       └── app_storage.dart
+│ ├── main.dart
+│ │
+│ ├── models/
+│ │ ├── expense.dart
+│ │ ├── models.dart
+│ │ ├── savings_goal.dart
+│ │ ├── schedule_item.dart
+│ │ ├── sleep_record.dart
+│ │ └── task.dart
+│ │
+│ ├── pages/
+│ │ ├── health_page.dart
+│ │ ├── home_page.dart
+│ │ ├── money_page.dart
+│ │ ├── planner_page.dart
+│ │ ├── schedule_page.dart
+│ │ └── imaluum_import_page.dart
+│ │
+│ ├── services/
+│ │ ├── imaluum/
+│ │ │ └── imaluum_timetable.dart
+│ │ └── schedule_export/
+│ │ └── schedule_export.dart
+│ │
+│ ├── utils/
+│ │ └── app_helpers.dart
+│ │ └── schedule_colors.dart
+│ │
+│ │
+│ ├── notification_service.dart
+│ │
+│ └── storage/
+│ └── app_storage.dart
 │
 ├── test/
 ├── pubspec.yaml
