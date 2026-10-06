@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/models.dart';
 import '../utils/app_helpers.dart';
@@ -81,12 +82,47 @@ class HomePage extends StatelessWidget {
                         .toList(),
                   ),
                 ),
+                const Divider(),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.feedback_outlined),
+                  title: const Text('Feedback & suggestions'),
+                  subtitle: const Text('Report an issue or request a feature'),
+                  trailing: const Icon(Icons.open_in_new, size: 18),
+                  onTap: () {
+                    Navigator.pop(dialogContext);
+                    _openFeedback(context);
+                  },
+                ),
               ],
             ),
           ),
         );
       },
     );
+  }
+
+  /// send feedback or suggest features.
+  Future<void> _openFeedback(BuildContext context) async {
+    final uri = Uri.parse('https://docs.google.com/forms/d/e/1FAIpQLSfgmgRaRcc4s83nBmCIdOrWDhJ7skS0LKQzZm1pN8VnyV3cCQ/viewform?usp=dialog');
+    try {
+      final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!opened && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not open the feedback page.'),
+          ),
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not open the feedback page.'),
+          ),
+        );
+      }
+    }
   }
 
   String _greeting() {

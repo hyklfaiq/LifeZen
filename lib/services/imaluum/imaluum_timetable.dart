@@ -56,12 +56,21 @@ class ImaluumTimetableParser {
 
       for (final rawRow in rows) {
         final row = List<String>.from(rawRow as List);
-        if (row.length <= [courseIndex, dayIndex, timeIndex].reduce((a, b) => a > b ? a : b)) {
+        if (_looksLikeHeader(row)) {
+          // Repeated header / group separator inside the table body.
+          // Never parsed as a subject.
           continue;
         }
-        final course = row[courseIndex].trim();
-        final days = _days(row[dayIndex]);
-        final period = _timeRange(row[timeIndex]);
+  
+        //   Pad the missing tail so fixed column indices still line up instead
+        // of shifting every value into the wrong column.
+        final aligned = _alignRow(row, headers.length);
+        if (aligned.length <= [courseIndex, dayIndex, timeIndex].reduce((a, b) => a > b ? a : b)) {
+          continue;
+        }
+        final course = aligned[courseIndex].trim();
+        final days = _days(aligned[dayIndex]);
+        final period = _timeRange(aligned[timeIndex]);
         if (course.isEmpty || days.isEmpty || period == null) continue;
         final titleIndex = _column(headers, ['course name', 'title', 'subject name', 'name']);
         final sectionIndex = _column(headers, ['section', 'sect', 'sec']);
@@ -71,14 +80,14 @@ class ImaluumTimetableParser {
         for (final day in days) {
           results.add(ImaluumMeeting(
             courseCode: course,
-            courseName: _value(row, titleIndex) ?? course,
+            courseName: _value(aligned, titleIndex) ?? course,
             day: day,
             start: period.$1,
             end: period.$2,
-            section: _value(row, sectionIndex),
-            venue: _venue(_value(row, venueIndex)),
-            lecturer: _value(row, lecturerIndex),
-            semester: _value(row, semesterIndex) ?? (table['semester'] as String?),
+            section: _value(aligned, sectionIndex),
+            venue: _venue(_value(aligned, venueIndex)),
+            lecturer: _value(aligned, lecturerIndex),
+            semester: _value(aligned, semesterIndex) ?? (table['semester'] as String?),
           ));
         }
       }
@@ -96,6 +105,31 @@ class ImaluumTimetableParser {
       if (index >= 0) return index;
     }
     return null;
+  }
+
+  /// Pads a short row with empty cells so it lines up with [width]
+  List<String> _alignRow(List<String> row, int width) {
+    if (row.length >= width) return row;
+    return [...row, ...List.filled(width - row.length, '')];
+  }
+
+  /// Detects repeated header and separator rows inside the table body so they are never mistaken for subjects.
+  bool _looksLikeHeader(List<String> row) {
+    final text = row.join(' ').toLowerCase();
+    if (text.contains('course') &&
+        text.contains('day') &&
+        text.contains('time')) {
+      return true;
+    }
+    if (row.isNotEmpty &&
+        row.every((cell) {
+          final value = cell.trim();
+          return value.isEmpty ||
+              RegExp(r'^[-\s\u2013\u2014]+$').hasMatch(value);
+        })) {
+      return true;
+    }
+    return false;
   }
 
   String? _value(List<String> row, int? index) {
@@ -233,20 +267,23 @@ List<int> _days(String input) {
         return (start, end);
       }
     }
-    final compact = RegExp(r'\b(\d{2})(\d{2})\s*(?:-|–|to)\s*(\d{2})(\d{2})\b')
+    // Compact portal times without a separator: 4 digits ("1000 - 1120")
+    final compact = RegExp(r'\b(\d{1,2})(\d{2})\s*(?:-|–|to)\s*(\d{1,2})(\d{2})\b')
         .firstMatch(input);
     if (compact != null) {
-      final start = TimeOfDay(
-        hour: int.parse(compact.group(1)!),
-        minute: int.parse(compact.group(2)!),
-      );
-      final end = TimeOfDay(
-        hour: int.parse(compact.group(3)!),
-        minute: int.parse(compact.group(4)!),
-      );
-      if (start.hour <= 23 && end.hour <= 23 &&
-          ImaluumMeeting._minutes(end) > ImaluumMeeting._minutes(start)) {
-        return (start, end);
+      final startHour = int.parse(compact.group(1)!);
+      final startMinute = int.parse(compact.group(2)!);
+      final endHour = int.parse(compact.group(3)!);
+      final endMinute = int.parse(compact.group(4)!);
+      if (startHour <= 23 &&
+          endHour <= 23 &&
+          startMinute <= 59 &&
+          endMinute <= 59) {
+        final start = TimeOfDay(hour: startHour, minute: startMinute);
+        final end = TimeOfDay(hour: endHour, minute: endMinute);
+        if (ImaluumMeeting._minutes(end) > ImaluumMeeting._minutes(start)) {
+          return (start, end);
+        }
       }
     }
     final matches = RegExp(r'(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)?', caseSensitive: false).allMatches(input).toList();

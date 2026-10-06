@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -22,6 +23,16 @@ class _ImaluumImportPageState extends State<ImaluumImportPage> {
   bool _loading = true;
   bool _extracting = false;
 
+
+  bool _schedulePageDetected = false;
+
+  Timer? _autoTimer;
+
+
+  int _pageSerial = 0;
+
+  int _scheduleOnlyPolls = 0;
+
   List<ImaluumMeeting> _meetings = const [];
 
   @override
@@ -36,7 +47,17 @@ class _ImaluumImportPageState extends State<ImaluumImportPage> {
             if (mounted) {
               setState(() {
                 _loading = true;
+                // Fresh page: drop the previous read so the poller picks
+                // up the new timetable instead of keeping a stale count.
+                _meetings = const [];
+                _pageSerial += 1;
               });
+              // Restart polling for the newly loading page.
+              _autoTimer ??= Timer.periodic(
+                const Duration(seconds: 3),
+                (_) => _autoPoll(),
+              );
+              _autoPoll();
             }
           },
           onPageFinished: (_) {
@@ -44,16 +65,110 @@ class _ImaluumImportPageState extends State<ImaluumImportPage> {
               setState(() {
                 _loading = false;
               });
+              // Try a read right away; the periodic poll below covers
+              // client-side navigation and late-rendered tables.
+              _autoPoll();
             }
           },
         ),
       )
       ..loadRequest(Uri.parse('https://imaluum.iium.edu.my/'));
+
+    _autoTimer = Timer.periodic(
+      const Duration(seconds: 3),
+      (_) => _autoPoll(),
+    );
   }
 
-  Future<void> _extract() async {
-    if (!await _isSchedulePage()) {
-      if (mounted) {
+  @override
+  void dispose() {
+    _autoTimer?.cancel();
+    super.dispose();
+  }
+
+  /// Periodic silent read
+  Future<void> _autoPoll() async {
+    if (!mounted || _extracting) return;
+
+    int signal;
+    try {
+      signal = await _timetableSignal();
+    } catch (_) {
+      return;
+    }
+    if (!mounted) return;
+
+    final onSchedule = signal > 0;
+    if (onSchedule != _schedulePageDetected) {
+      setState(() {
+        _schedulePageDetected = onSchedule;
+      });
+    }
+    if (signal == 2) {
+      _scheduleOnlyPolls = 0;
+    } else if (signal == 1) {
+      _scheduleOnlyPolls += 1;
+      if (_scheduleOnlyPolls % 4 != 0) return;
+    } else {
+      _scheduleOnlyPolls = 0;
+      return;
+    }
+
+    final serial = _pageSerial;
+
+    await _extract(automatic: true, skipScheduleCheck: true, serial: serial);
+    if (!mounted || serial != _pageSerial) return;
+  }
+
+  Future<int> _timetableSignal() async {
+    const probe = r'''
+(function () {
+  const path = (window.location.pathname || '').toLowerCase();
+  const onSchedulePath = path.indexOf('/myacademic/schedule') === 0;
+  const tables = Array.from(document.querySelectorAll('table'));
+  for (const table of tables) {
+    const rows = Array.from(table.querySelectorAll('tr')).filter(
+      (row) => row.closest('table') === table
+    );
+    for (const row of rows) {
+      const cells = Array.from(row.children).filter(
+        (child) => child.tagName === 'TD' || child.tagName === 'TH'
+      );
+      const text = cells
+        .map((cell) => (cell.innerText || cell.textContent || '').trim())
+        .join(' ')
+        .toLowerCase();
+      if (
+        text.indexOf('code') !== -1 &&
+        text.indexOf('day') !== -1 &&
+        text.indexOf('time') !== -1
+      ) {
+        return 2;
+      }
+    }
+  }
+  if (onSchedulePath) return 1;
+  return 0;
+})()
+''';
+    final response = await _controller.runJavaScriptReturningResult(probe);
+    var text = response.toString().trim();
+    if (text.length >= 2 && text.startsWith('"') && text.endsWith('"')) {
+      text = text.substring(1, text.length - 1);
+    }
+    return int.tryParse(text) ?? 0;
+  }
+
+  Future<void> _extract(
+      {bool automatic = false,
+      bool skipScheduleCheck = false,
+      int? serial}) async {
+    if (_extracting) return;
+
+    if (!skipScheduleCheck && !await _isSchedulePage()) {
+      // Automatic reads stay silent off the schedule page (the user may
+      // still be signing in); manual taps keep the guidance message.
+      if (!automatic && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Open Class Timetable before reading it.'),
@@ -77,7 +192,7 @@ class _ImaluumImportPageState extends State<ImaluumImportPage> {
     document.querySelectorAll('table')
   );
 
-  const output = [];
+  const output = []
 
   // Find semester from the page.
   //
@@ -107,9 +222,24 @@ class _ImaluumImportPageState extends State<ImaluumImportPage> {
   }
 
   for (const table of tables) {
+    // Only rows that belong to this table itself: each nested table is
+    // visited again on its own turn, so its rows must not leak into the
+    // outer table. Without this filter an outer row merges its cell text
+    // with every nested cell, collapsing two subjects into one row and
+    // hiding the next subject entirely.
     const rows = Array.from(
       table.querySelectorAll('tr')
-    );
+    ).filter((row) => row.closest('table') === table);
+
+    // Direct cell children only, so a cell that holds a nested table
+    // does not leak the nested cells into this row.
+    const directCells = (row) =>
+      Array.from(row.children).filter(
+        (child) => child.tagName === 'TD' || child.tagName === 'TH'
+      );
+
+    const cellText = (cell) =>
+      (cell.innerText || cell.textContent || '').trim();
 
     if (rows.length === 0) {
       continue;
@@ -118,13 +248,7 @@ class _ImaluumImportPageState extends State<ImaluumImportPage> {
     let headerIndex = -1;
 
     for (let i = 0; i < rows.length; i++) {
-      const cells = Array.from(
-        rows[i].querySelectorAll('th, td')
-      );
-
-      const values = cells.map((cell) =>
-        (cell.innerText || cell.textContent || '').trim()
-      );
+      const values = directCells(rows[i]).map(cellText);
 
       const text = values.join(' ').toLowerCase();
 
@@ -142,32 +266,84 @@ class _ImaluumImportPageState extends State<ImaluumImportPage> {
       continue;
     }
 
-    const headerCells = Array.from(
-      rows[headerIndex].querySelectorAll('th, td')
-    );
+    const headers = directCells(rows[headerIndex]).map(cellText);
 
-    const headers = headerCells.map((cell) =>
-      (cell.innerText || cell.textContent || '').trim()
-    );
-
+    // Expand rowspan/colspan so every data row carries the full column
+    // count. A subject that shares a cell with the row above (course
+    // block, shared venue) or whose empty cell was absorbed by a span
+    // otherwise shifts every value left: its day/time land in the wrong
+    // columns and fail to parse, and the same block hides the next
+    // subject's cells as well.
     const dataRows = [];
+    const active = [];
 
     for (
       let i = headerIndex + 1;
       i < rows.length;
       i++
     ) {
-      const cells = Array.from(
-        rows[i].querySelectorAll('td, th')
-      );
+      const cells = directCells(rows[i]);
 
       if (cells.length === 0) {
         continue;
       }
 
-      const values = cells.map((cell) =>
-        (cell.innerText || cell.textContent || '').trim()
-      );
+      const values = [];
+      let domIndex = 0;
+
+      for (let col = 0; domIndex < cells.length; col++) {
+        const carried = active[col];
+
+        if (carried && carried.left > 0) {
+          carried.left -= 1;
+          values.push(carried.value);
+
+          if (carried.left <= 0) {
+            active[col] = undefined;
+          }
+
+          continue;
+        }
+
+        const cell = cells[domIndex++];
+
+        const text = cellText(cell);
+
+        const rowSpan = Math.max(
+          1,
+          parseInt(cell.getAttribute('rowspan') || '1', 10) || 1
+        );
+
+        const colSpan = Math.max(
+          1,
+          parseInt(cell.getAttribute('colspan') || '1', 10) || 1
+        );
+
+        for (let k = 0; k < colSpan; k++) {
+          active[col + k] = rowSpan > 1
+            ? { value: text, left: rowSpan - 1 }
+            : undefined;
+          values.push(text);
+        }
+
+        col += colSpan - 1;
+      }
+
+      // Carry spanned values from the row above into trailing columns.
+      for (let col = values.length; col < active.length; col++) {
+        const carried = active[col];
+
+        if (carried && carried.left > 0) {
+          carried.left -= 1;
+          values.push(carried.value);
+
+          if (carried.left <= 0) {
+            active[col] = undefined;
+          }
+        } else {
+          break;
+        }
+      }
 
       dataRows.push(values);
     }
@@ -216,7 +392,7 @@ class _ImaluumImportPageState extends State<ImaluumImportPage> {
 
       final meetings = _parser.parseTables(tables);
 
-      if (!mounted) {
+      if (!mounted || (serial != null && serial != _pageSerial)) {
         return;
       }
 
@@ -224,7 +400,7 @@ class _ImaluumImportPageState extends State<ImaluumImportPage> {
         _meetings = meetings;
       });
 
-      if (meetings.isEmpty) {
+      if (meetings.isEmpty && !automatic) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
@@ -255,13 +431,60 @@ class _ImaluumImportPageState extends State<ImaluumImportPage> {
     }
   }
 
+  /// Visible auto-read status
+  Widget _buildAutoStatus() {
+    final scheme = Theme.of(context).colorScheme;
+    late final String text;
+    late final bool busy;
+    late final IconData icon;
+    if (_extracting) {
+      text = 'Reading timetable…';
+      busy = true;
+      icon = Icons.sync_outlined;
+    } else if (_meetings.isNotEmpty) {
+      text = 'Found ${_meetings.length} '
+          'meeting${_meetings.length == 1 ? '' : 's'} — tap Import below.';
+      busy = false;
+      icon = Icons.check_circle_outlined;
+    } else if (_schedulePageDetected) {
+      text = 'Timetable page open — waiting for the table to load…';
+      busy = true;
+      icon = Icons.hourglass_bottom_outlined;
+    } else {
+      text = 'Open your Class Timetable in the page below.';
+      busy = false;
+      icon = Icons.info_outlined;
+    }
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest,
+        border: Border(bottom: BorderSide(color: scheme.outlineVariant)),
+      ),
+      child: Row(
+        children: [
+          if (busy)
+            const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          else
+            Icon(icon, size: 16),
+          const SizedBox(width: 8),
+          Expanded(child: Text(text)),
+        ],
+      ),
+    );
+  }
+
   Future<bool> _isSchedulePage() async {
     final currentUrl = await _controller.currentUrl();
 
     final path = Uri.tryParse(currentUrl ?? '')?.path.toLowerCase() ?? '';
 
-    return path.startsWith('/myacademic/schedule') ||
-        path.startsWith('/confirmationslip');
+    return path.startsWith('/myacademic/schedule');
   }
 
   Future<void> _import() async {
@@ -297,7 +520,7 @@ class _ImaluumImportPageState extends State<ImaluumImportPage> {
           IconButton(
             onPressed: (_loading || _extracting) ? null : _extract,
             icon: const Icon(Icons.download_outlined),
-            tooltip: 'Read timetable',
+            tooltip: 'Re-read timetable',
           ),
         ],
         bottom: _loading
@@ -322,11 +545,13 @@ class _ImaluumImportPageState extends State<ImaluumImportPage> {
             padding: const EdgeInsets.all(12),
             child: const Text(
               'Sign in directly with IIUM and complete any CAPTCHA yourself. '
-              'Open Class Timetable, then tap the download button. '
+              'Open Class Timetable and your meetings are read automatically. '
               'LifeZen does not read or store your password, cookies, '
               'or authentication tokens.',
             ),
           ),
+
+          _buildAutoStatus(),
 
           if (_extracting) const LinearProgressIndicator(),
 
