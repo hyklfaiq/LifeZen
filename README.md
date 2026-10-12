@@ -37,6 +37,7 @@
 * [Notifications](#notifications)
 * [i-Ma'luum Integration](#i-maluum-integration)
 * [Schedule export](#schedule-export)
+* [Feedback](#feedback)
 * [Releases](#releases)
 * [Current Version](#current-version)
 * [License](#license)
@@ -66,23 +67,33 @@ The application combines task planning, timetable management, sleep tracking, ex
 
 ### 📅 Schedule
 
-* Create weekly recurring schedules.
-* View schedules in a timetable.
-* Choose between different timetable viewing modes.
-* Use compact schedule viewing for a more condensed timetable.
-* Zoom and drag the timetable to view schedules more easily.
+### 📅 Schedule
+
+* Create and manage weekly recurring schedules.
+* View schedules in a weekly timetable.
+* Switch between different timetable viewing modes.
+* Use compact mode for a more condensed timetable.
+- Zoom and drag the timetable for easier navigation.
 * Assign custom colors to subjects.
-* View a live current-time indicator across the timetable.
-* Manage scheduled activities.
+* View a live current-time indicator.
+* Add, edit, and delete scheduled activities.
+* Edit imported class details and save changes.
+* Add classes without fixed days or times.
+* View untimed classes in a dedicated **No Fixed Time** section.
 * Receive notifications for upcoming scheduled activities.
-* Export schedules in multiple formats.
+* Export schedules as ICS, CSV, or PNG files.
 
 ### 🕌 i-Ma'luum Integration
 
-* Import timetable information from i-Ma'luum.
-* Automatically integrate imported schedules into LifeZen.
-* Reduce the need to manually enter recurring academic schedules.
-* Manage imported schedules alongside manually created schedules.
+- Import timetable information from i-Ma'luum.
+- Automatically read and parse timetable data during import.
+- Handle different time formats, including three-digit times such as `830`.
+- Retain subjects without recognized days or times.
+- Support multiple lecturers for a single class.
+- Preserve course details such as course code, course name, lecturer, venue, section, and semester.
+- Display imported classes with shorter, cleaner titles.
+- Manage imported schedules alongside manually created classes.
+- Edit imported class details without losing changes.
 
 > i-Ma'luum integration is available in the current version of LifeZen.
 
@@ -140,6 +151,8 @@ User data is stored locally on the device using Shared Preferences.
 No account or online database is required for the core application.
 
 ---
+
+
 
 # Getting Started
 
@@ -348,6 +361,7 @@ Imported schedules can be managed alongside regular LifeZen schedules.
 ---
 
 > **Disclaimer:** LifeZen is an independent student project and is **not affiliated with, endorsed by, sponsored by, or officially connected to the International Islamic University Malaysia (IIUM) or i-Ma'luum.** The i-Ma'luum integration is provided solely as a convenience for users and does not represent an official IIUM service.
+
 # Schedule Export
 
 LifeZen supports exporting schedule information for use outside the application.
@@ -360,6 +374,13 @@ PNG for sharing or saving a visual copy of the timetable.
 
 Exported schedules contain the relevant timetable information available in LifeZen.
 
+# Feedback
+
+- Report bugs directly through the app.
+- Suggest new features and improvements.
+- Share feedback to help improve LifeZen.
+
+Users can access the feedback form through the application settings.
 
 # Releases
 
@@ -379,7 +400,7 @@ For detailed information about changes in a specific version, see the release no
 
 # Current Version
 
-**Version: 2.0.0**
+**Version: 2.1.3**
 
 For the latest changes, improvements, and bug fixes, see the [GitHub Releases](https://github.com/hyklfaiq/LifeZen/releases) page.
 
