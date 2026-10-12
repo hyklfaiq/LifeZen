@@ -374,6 +374,14 @@ class _MainScreenState extends State<MainScreen> {
       time: item.time,
       endTime: item.endTime,
       repeatDays: List<int>.from(item.repeatDays),
+      importKey: item.importKey,
+      courseCode: item.courseCode,
+      courseName: item.courseName,
+      venue: item.venue,
+      lecturer: item.lecturer,
+      section: item.section,
+      semester: item.semester,
+      hasTime: item.hasTime,
     );
     schedule.add(newItem);
     if (mounted) {
@@ -404,19 +412,23 @@ class _MainScreenState extends State<MainScreen> {
         .whereType<String>();
     final added = <ScheduleItem>[];
     for (final meeting in excludeImportedMeetings(meetings, existingKeys)) {
-      final details = [
-        meeting.courseCode,
-        if (meeting.courseName != meeting.courseCode) meeting.courseName,
-        if (meeting.section != null) 'Section ${meeting.section}',
-        if (meeting.venue != null) meeting.venue!,
-      ];
+      // The schedule name only duplicates the course name; course code,
+      // section and venue stay in their own fields instead of being
+      // crammed into the title.
+      final start = meeting.start ?? const TimeOfDay(hour: 9, minute: 0);
+      final end = meeting.end ??
+          TimeOfDay(
+            hour: start.hour < 23 ? start.hour + 1 : 23,
+            minute: start.minute,
+          );
       added.add(
         ScheduleItem(
           id: DateTime.now().microsecondsSinceEpoch + added.length,
-          title: details.join(' • '),
-          time: meeting.start,
-          endTime: meeting.end,
-          repeatDays: [meeting.day],
+          title: meeting.courseName,
+          time: start,
+          endTime: end,
+          repeatDays: meeting.hasTime ? <int>[meeting.day!] : <int>[],
+          hasTime: meeting.hasTime,
           importKey: meeting.importKey,
           courseCode: meeting.courseCode,
           courseName: meeting.courseName,
@@ -473,13 +485,16 @@ class _MainScreenState extends State<MainScreen> {
       time: updatedItem.time,
       endTime: updatedItem.endTime,
       repeatDays: List<int>.from(updatedItem.repeatDays),
-      importKey: oldItem.importKey,
-      courseCode: oldItem.courseCode,
-      courseName: oldItem.courseName,
-      venue: oldItem.venue,
-      lecturer: oldItem.lecturer,
-      section: oldItem.section,
-      semester: oldItem.semester,
+      importKey: updatedItem.importKey ?? oldItem.importKey,
+      // Detail edits made in the dialog must survive; keeping the old
+      // values here made imported class details impossible to edit.
+      courseCode: updatedItem.courseCode,
+      courseName: updatedItem.courseName,
+      venue: updatedItem.venue,
+      lecturer: updatedItem.lecturer,
+      section: updatedItem.section,
+      semester: updatedItem.semester,
+      hasTime: updatedItem.hasTime,
     );
     if (mounted) {
       setState(() {});

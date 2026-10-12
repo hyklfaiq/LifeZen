@@ -14,6 +14,11 @@ class ScheduleItem {
   final String? section;
   final String? semester;
 
+  /// False for subjects that have no usable day/time in the portal.
+  /// They are listed under the schedule's "No fixed time" section
+  /// instead of being placed on the hourly grid.
+  final bool hasTime;
+
   ScheduleItem({
     required this.id,
     required this.title,
@@ -27,6 +32,7 @@ class ScheduleItem {
     this.lecturer,
     this.section,
     this.semester,
+    this.hasTime = true,
   });
 
   Map<String, dynamic> toMap() {
@@ -45,6 +51,7 @@ class ScheduleItem {
       if (lecturer != null) 'lecturer': lecturer,
       if (section != null) 'section': section,
       if (semester != null) 'semester': semester,
+      'hasTime': hasTime,
     };
   }
 
@@ -77,6 +84,7 @@ class ScheduleItem {
       lecturer: map['lecturer'] as String?,
       section: map['section']?.toString(),
       semester: map['semester'] as String?,
+      hasTime: map['hasTime'] as bool? ?? true,
     );
   }
 }

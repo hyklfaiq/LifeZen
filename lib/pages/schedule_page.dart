@@ -830,6 +830,10 @@ class _SchedulePageState extends State<SchedulePage> {
     int latestMinutes = 18 * 60;
 
     for (final item in widget.schedule) {
+      if (!item.hasTime) {
+        continue;
+      }
+
       final start = item.time.hour * 60 + item.time.minute;
 
       final end = item.endTime.hour * 60 + item.endTime.minute;
@@ -1467,17 +1471,17 @@ class _SchedulePageState extends State<SchedulePage> {
           : null;
 
       if (rawCode == null || rawCode.isEmpty) {
+        // Manual classes have no course code, so the card shows the full
+        // title. Keep a readable font size and wrap with ellipsis instead
+        // of letting FittedBox scale the text down to a few pixels.
+        final maxLines = height >= 70 ? 3 : height >= 45 ? 2 : 1;
         return Center(
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              compactTitle,
-              maxLines: 1,
-              softWrap: false,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: compactCodeStyle(11),
-            ),
+          child: Text(
+            compactTitle,
+            maxLines: maxLines,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: compactCodeStyle(12),
           ),
         );
       }
@@ -1677,6 +1681,155 @@ class _SchedulePageState extends State<SchedulePage> {
   }
 
   // ===========================================================================
+  // NO FIXED TIME SECTION
+  // ===========================================================================
+
+  List<ScheduleItem> get _untimedItems =>
+      widget.schedule.where((item) => !item.hasTime).toList();
+
+  Widget _buildUntimedSection(bool isLandscape) {
+    final items = _untimedItems;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 20, vertical: isLandscape ? 2 : 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.schedule_outlined, size: 16, color: colorScheme.primary),
+              const SizedBox(width: 6),
+              Text(
+                'No fixed time',
+                style: TextStyle(
+                  fontSize: isLandscape ? 11 : 13,
+                  fontWeight: FontWeight.w700,
+                  color: colorScheme.primary,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '${items.length}',
+                style: TextStyle(
+                  fontSize: isLandscape ? 10 : 12,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final item in items) _untimedCard(item, isLandscape),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _untimedCard(ScheduleItem item, bool isLandscape) {
+    final subjectColor = colorForSubject(
+      subjectKeyForScheduleItem(item),
+      Theme.of(context).brightness,
+    );
+
+    final courseCode = item.courseCode?.trim();
+    final courseName = item.courseName?.trim();
+    final subject = (courseName != null && courseName.isNotEmpty)
+        ? courseName
+        : item.title.trim();
+    final label = (courseCode != null &&
+            courseCode.isNotEmpty &&
+            courseCode != subject)
+        ? '$courseCode • $subject'
+        : subject;
+
+    return Material(
+      color: subjectColor.background,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () {
+          showScheduleDialog(existing: item);
+        },
+        child: Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: isLandscape ? 6 : 8,
+          ),
+          decoration: BoxDecoration(
+            border: Border.all(color: subjectColor.border),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: isLandscape ? 12 : 13,
+                    fontWeight: FontWeight.w600,
+                    height: 1.2,
+                    color: subjectColor.foreground,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () async {
+                  final confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (dialogContext) {
+                      return AlertDialog(
+                        title: const Text('Delete schedule?'),
+                        content: Text('Delete "$subject" from your schedule?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () {
+                              Navigator.of(dialogContext).pop(false);
+                            },
+                            child: const Text('Cancel'),
+                          ),
+                          FilledButton(
+                            onPressed: () {
+                              Navigator.of(dialogContext).pop(true);
+                            },
+                            child: const Text('Delete'),
+                          ),
+                        ],
+                      );
+                    },
+                  );
+
+                  if (confirmed == true && mounted) {
+                    await widget.onDeleteSchedule(item.id);
+                  }
+                },
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: Icon(
+                    Icons.delete_outline,
+                    size: 18,
+                    color: subjectColor.foreground,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ===========================================================================
   // BUILD
   // ===========================================================================
 
@@ -1829,6 +1982,11 @@ class _SchedulePageState extends State<SchedulePage> {
           SizedBox(height: isLandscape ? 4 : 12),
 
           // -------------------------------------------------------------------
+          // NO FIXED TIME
+          // -------------------------------------------------------------------
+          if (_untimedItems.isNotEmpty) _buildUntimedSection(isLandscape),
+
+          // -------------------------------------------------------------------
           // CONTENT
           // -------------------------------------------------------------------
           Expanded(
@@ -1917,11 +2075,17 @@ class _ScheduleEditorDialogState extends State<_ScheduleEditorDialog> {
 
   bool showDetails = false;
 
+  /// Mirrors [ScheduleItem.hasTime]: when false the item belongs to the
+  /// "No fixed time" section and the time/repeat controls are hidden.
+  bool noFixedTime = false;
+
   @override
   void initState() {
     super.initState();
 
     final existing = widget.existing;
+
+    noFixedTime = existing != null && !existing.hasTime;
 
     titleController = TextEditingController(text: existing?.title ?? '');
 
@@ -2073,24 +2237,26 @@ class _ScheduleEditorDialogState extends State<_ScheduleEditorDialog> {
       return;
     }
 
-    if (selectedDays.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select at least one day.')),
-      );
+    if (!noFixedTime) {
+      if (selectedDays.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please select at least one day.')),
+        );
 
-      return;
-    }
+        return;
+      }
 
-    final startMinutes = selectedTime.hour * 60 + selectedTime.minute;
+      final startMinutes = selectedTime.hour * 60 + selectedTime.minute;
 
-    final endMinutes = selectedEndTime.hour * 60 + selectedEndTime.minute;
+      final endMinutes = selectedEndTime.hour * 60 + selectedEndTime.minute;
 
-    if (endMinutes <= startMinutes) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('End time must be after start time.')),
-      );
+      if (endMinutes <= startMinutes) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('End time must be after start time.')),
+        );
 
-      return;
+        return;
+      }
     }
 
     final existing = widget.existing;
@@ -2112,7 +2278,8 @@ class _ScheduleEditorDialogState extends State<_ScheduleEditorDialog> {
       title: title,
       time: selectedTime,
       endTime: selectedEndTime,
-      repeatDays: List<int>.from(selectedDays),
+      repeatDays: noFixedTime ? <int>[] : List<int>.from(selectedDays),
+      hasTime: !noFixedTime,
       importKey: existing?.importKey,
       courseCode: courseCode.isEmpty ? null : courseCode,
       courseName: courseName.isEmpty ? null : courseName,
@@ -2277,59 +2444,81 @@ class _ScheduleEditorDialogState extends State<_ScheduleEditorDialog> {
               const SizedBox(height: 16),
 
               // -----------------------------------------------------------------
-              // START TIME
+              // NO FIXED TIME
               // -----------------------------------------------------------------
-              ListTile(
+              SwitchListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.access_time),
-                title: const Text('Start time'),
-                subtitle: Text(formatTimeOfDay(selectedTime)),
-                onTap: _pickStartTime,
-              ),
-
-              // -----------------------------------------------------------------
-              // END TIME
-              // -----------------------------------------------------------------
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.timelapse_outlined),
-                title: const Text('End time'),
-                subtitle: Text(formatTimeOfDay(selectedEndTime)),
-                onTap: _pickEndTime,
-              ),
-
-              const SizedBox(height: 8),
-
-              // -----------------------------------------------------------------
-              // REPEAT
-              // -----------------------------------------------------------------
-              const Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Repeat',
+                title: const Text(
+                  'No fixed time',
                   style: TextStyle(fontWeight: FontWeight.w600),
                 ),
+                subtitle: const Text(
+                  'Listed under "No fixed time" instead of the timetable',
+                ),
+                value: noFixedTime,
+                onChanged: (value) {
+                  setState(() {
+                    noFixedTime = value;
+                  });
+                },
               ),
 
-              const SizedBox(height: 8),
+              if (!noFixedTime) ...[
+                // ---------------------------------------------------------------
+                // START TIME
+                // ---------------------------------------------------------------
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.access_time),
+                  title: const Text('Start time'),
+                  subtitle: Text(formatTimeOfDay(selectedTime)),
+                  onTap: _pickStartTime,
+                ),
 
-              Wrap(
-                spacing: 6,
-                runSpacing: 4,
-                children: List.generate(7, (index) {
-                  final day = index + 1;
+                // ---------------------------------------------------------------
+                // END TIME
+                // ---------------------------------------------------------------
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.timelapse_outlined),
+                  title: const Text('End time'),
+                  subtitle: Text(formatTimeOfDay(selectedEndTime)),
+                  onTap: _pickEndTime,
+                ),
 
-                  final selected = selectedDays.contains(day);
+                const SizedBox(height: 8),
 
-                  return FilterChip(
-                    label: Text(names[index]),
-                    selected: selected,
-                    onSelected: (value) {
-                      _toggleDay(day, value);
-                    },
-                  );
-                }),
-              ),
+                // ---------------------------------------------------------------
+                // REPEAT
+                // ---------------------------------------------------------------
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Repeat',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+
+                const SizedBox(height: 8),
+
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: List.generate(7, (index) {
+                    final day = index + 1;
+
+                    final selected = selectedDays.contains(day);
+
+                    return FilterChip(
+                      label: Text(names[index]),
+                      selected: selected,
+                      onSelected: (value) {
+                        _toggleDay(day, value);
+                      },
+                    );
+                  }),
+                ),
+              ],
             ],
           ),
         ),

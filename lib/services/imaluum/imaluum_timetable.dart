@@ -6,9 +6,9 @@ class ImaluumMeeting {
   const ImaluumMeeting({
     required this.courseCode,
     required this.courseName,
-    required this.day,
-    required this.start,
-    required this.end,
+    this.day,
+    this.start,
+    this.end,
     this.venue,
     this.lecturer,
     this.section,
@@ -17,23 +17,40 @@ class ImaluumMeeting {
 
   final String courseCode;
   final String courseName;
-  final int day;
-  final TimeOfDay start;
-  final TimeOfDay end;
+
+  /// Day/start/end are null when the portal row has no usable time.
+  /// Such meetings are listed under the schedule's "No fixed time"
+  /// section instead of the hourly grid.
+  final int? day;
+  final TimeOfDay? start;
+  final TimeOfDay? end;
   final String? venue;
   final String? lecturer;
   final String? section;
   final String? semester;
 
-  String get importKey => [
+  bool get hasTime => day != null && start != null && end != null;
+
+  String get importKey {
+    if (!hasTime) {
+      return [
         courseCode.toUpperCase(),
         section ?? '',
         semester ?? '',
-        day,
-        _minutes(start),
-        _minutes(end),
+        'notime',
         venue?.toUpperCase() ?? '',
       ].join('|');
+    }
+    return [
+      courseCode.toUpperCase(),
+      section ?? '',
+      semester ?? '',
+      day,
+      _minutes(start!),
+      _minutes(end!),
+      venue?.toUpperCase() ?? '',
+    ].join('|');
+  }
 
   static int _minutes(TimeOfDay value) => value.hour * 60 + value.minute;
 }
@@ -69,24 +86,47 @@ class ImaluumTimetableParser {
           continue;
         }
         final course = aligned[courseIndex].trim();
+        if (course.isEmpty) continue;
         final days = _days(aligned[dayIndex]);
         final period = _timeRange(aligned[timeIndex]);
-        if (course.isEmpty || days.isEmpty || period == null) continue;
         final titleIndex = _column(headers, ['course name', 'title', 'subject name', 'name']);
         final sectionIndex = _column(headers, ['section', 'sect', 'sec']);
         final venueIndex = _column(headers, ['venue', 'room', 'location']);
         final lecturerIndex = _column(headers, ['lecturer', 'instructor', 'staff']);
         final semesterIndex = _column(headers, ['semester', 'session', 'sem year']);
-        for (final day in days) {
+        if (days.isNotEmpty && period != null) {
+          for (final day in days) {
+            results.add(ImaluumMeeting(
+              courseCode: course,
+              courseName: _value(aligned, titleIndex) ?? course,
+              day: day,
+              start: period.$1,
+              end: period.$2,
+              section: _value(aligned, sectionIndex),
+              venue: _venue(_value(aligned, venueIndex)),
+              lecturer: _lecturer(_value(aligned, lecturerIndex)),
+              semester: _value(aligned, semesterIndex) ?? (table['semester'] as String?),
+            ));
+          }
+        } else {
+          // The row has no usable time (and/or no day) but still names a
+          // subject. Keep it once so the schedule can list it under
+          // "No fixed time" instead of silently dropping it. Rows with
+          // fewer than two filled cells are table furniture, not subjects.
+          final filled = aligned.where((cell) {
+            final value = cell.trim();
+            return value.isNotEmpty && value != '-';
+          }).length;
+          if (filled < 2) continue;
           results.add(ImaluumMeeting(
             courseCode: course,
             courseName: _value(aligned, titleIndex) ?? course,
-            day: day,
-            start: period.$1,
-            end: period.$2,
+            day: null,
+            start: null,
+            end: null,
             section: _value(aligned, sectionIndex),
             venue: _venue(_value(aligned, venueIndex)),
-            lecturer: _value(aligned, lecturerIndex),
+            lecturer: _lecturer(_value(aligned, lecturerIndex)),
             semester: _value(aligned, semesterIndex) ?? (table['semester'] as String?),
           ));
         }
@@ -155,6 +195,23 @@ String _venue(String? value) {
     }
 
     return cleaned;
+  }
+
+  /// Normalises a lecturer cell that may list several lecturers separated
+  /// by line breaks (portal <br>) or semicolons into a single
+  /// "Dr. A, Dr. B" string so cards, home and exports show them cleanly.
+  String? _lecturer(String? value) {
+    if (value == null) return null;
+
+    final parts = value
+        .split(RegExp(r'[\n\r;]+'))
+        .map((part) => part.replaceAll(RegExp(r'\s+'), ' ').trim())
+        .where((part) => part.isNotEmpty && part != '-')
+        .toList();
+
+    if (parts.isEmpty) return null;
+
+    return parts.join(', ');
   }
 
 List<int> _days(String input) {

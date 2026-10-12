@@ -31,7 +31,10 @@ class _ImaluumImportPageState extends State<ImaluumImportPage> {
 
   int _pageSerial = 0;
 
-  int _scheduleOnlyPolls = 0;
+  /// Re-entrancy guard: [_autoPoll] is async, so timer ticks and navigation
+  /// callbacks could otherwise overlap and stack heavy DOM reads on top of
+  /// each other, freezing the page inside the WebView.
+  bool _polling = false;
 
   List<ImaluumMeeting> _meetings = const [];
 
@@ -52,9 +55,10 @@ class _ImaluumImportPageState extends State<ImaluumImportPage> {
                 _meetings = const [];
                 _pageSerial += 1;
               });
-              // Restart polling for the newly loading page.
+              // Restart polling for the newly loading page. Gentle 5s
+              // cadence so the portal server is never hammered.
               _autoTimer ??= Timer.periodic(
-                const Duration(seconds: 3),
+                const Duration(seconds: 5),
                 (_) => _autoPoll(),
               );
               _autoPoll();
@@ -75,7 +79,9 @@ class _ImaluumImportPageState extends State<ImaluumImportPage> {
       ..loadRequest(Uri.parse('https://imaluum.iium.edu.my/'));
 
     _autoTimer = Timer.periodic(
-      const Duration(seconds: 3),
+      // Gentle cadence: the poller backs off further once a reading
+      // succeeds, and stops entirely (see _autoPoll).
+      const Duration(seconds: 5),
       (_) => _autoPoll(),
     );
   }
@@ -86,38 +92,37 @@ class _ImaluumImportPageState extends State<ImaluumImportPage> {
     super.dispose();
   }
 
-  /// Periodic silent read
+  /// Lightweight poller: cheap schedule-path gate first (no DOM scan off the
+  /// timetable, so SSO/CAPTCHA/dashboard pages cost nothing), at most one
+  /// poll at a time, and the timer parks once a reading succeeds.
   Future<void> _autoPoll() async {
-    if (!mounted || _extracting) return;
-
-    int signal;
+    if (!mounted || _loading || _extracting || _polling) return;
+    if (_meetings.isNotEmpty) return;
+    _polling = true;
     try {
-      signal = await _timetableSignal();
-    } catch (_) {
-      return;
-    }
-    if (!mounted) return;
+      int signal;
+      try {
+        signal = await _timetableSignal();
+      } catch (_) {
+        return;
+      }
+      if (!mounted || _meetings.isNotEmpty) return;
 
-    final onSchedule = signal > 0;
-    if (onSchedule != _schedulePageDetected) {
-      setState(() {
-        _schedulePageDetected = onSchedule;
-      });
-    }
-    if (signal == 2) {
-      _scheduleOnlyPolls = 0;
-    } else if (signal == 1) {
-      _scheduleOnlyPolls += 1;
-      if (_scheduleOnlyPolls % 4 != 0) return;
-    } else {
-      _scheduleOnlyPolls = 0;
-      return;
-    }
+      final onSchedule = signal > 0;
+      if (onSchedule != _schedulePageDetected) {
+        setState(() {
+          _schedulePageDetected = onSchedule;
+        });
+      }
+      if (signal != 2) return;
 
-    final serial = _pageSerial;
+      final serial = _pageSerial;
 
-    await _extract(automatic: true, skipScheduleCheck: true, serial: serial);
-    if (!mounted || serial != _pageSerial) return;
+      await _extract(automatic: true, skipScheduleCheck: true, serial: serial);
+      if (!mounted || serial != _pageSerial) return;
+    } finally {
+      _polling = false;
+    }
   }
 
   Future<int> _timetableSignal() async {
@@ -134,8 +139,10 @@ class _ImaluumImportPageState extends State<ImaluumImportPage> {
       const cells = Array.from(row.children).filter(
         (child) => child.tagName === 'TD' || child.tagName === 'TH'
       );
+      // textContent instead of innerText: innerText forces a layout
+      // reflow of the timetable on every poll, which can freeze the page.
       const text = cells
-        .map((cell) => (cell.innerText || cell.textContent || '').trim())
+        .map((cell) => cell.textContent || '')
         .join(' ')
         .toLowerCase();
       if (
@@ -151,7 +158,9 @@ class _ImaluumImportPageState extends State<ImaluumImportPage> {
   return 0;
 })()
 ''';
-    final response = await _controller.runJavaScriptReturningResult(probe);
+    final response = await _controller
+        .runJavaScriptReturningResult(probe)
+        .timeout(const Duration(seconds: 8));
     var text = response.toString().trim();
     if (text.length >= 2 && text.startsWith('"') && text.endsWith('"')) {
       text = text.substring(1, text.length - 1);
@@ -364,7 +373,9 @@ class _ImaluumImportPageState extends State<ImaluumImportPage> {
 })()
 ''';
 
-      final response = await _controller.runJavaScriptReturningResult(script);
+      final response = await _controller
+          .runJavaScriptReturningResult(script)
+          .timeout(const Duration(seconds: 15));
 
       String jsonText = response.toString();
 
@@ -399,6 +410,13 @@ class _ImaluumImportPageState extends State<ImaluumImportPage> {
       setState(() {
         _meetings = meetings;
       });
+
+      // First valid read: park the auto-poller so the portal is left alone.
+      // Navigation restarts it; the AppBar button re-reads on demand.
+      if (automatic && meetings.isNotEmpty) {
+        _autoTimer?.cancel();
+        _autoTimer = null;
+      }
 
       if (meetings.isEmpty && !automatic) {
         ScaffoldMessenger.of(context).showSnackBar(
