@@ -67,8 +67,6 @@ The application combines task planning, timetable management, sleep tracking, ex
 
 ### 📅 Schedule
 
-### 📅 Schedule
-
 * Create and manage weekly recurring schedules.
 * View schedules in a weekly timetable.
 * Switch between different timetable viewing modes.
@@ -395,16 +393,6 @@ Each release may include:
 * Improvements
 
 For detailed information about changes in a specific version, see the release notes for that version.
-
----
-
-# Current Version
-
-**Version: 2.1.3**
-
-For the latest changes, improvements, and bug fixes, see the [GitHub Releases](https://github.com/hyklfaiq/LifeZen/releases) page.
-
----
 
 ---
 
