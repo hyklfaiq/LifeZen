@@ -11,12 +11,10 @@ class HomePage extends StatelessWidget {
   final List<Task> tasks;
   final List<SleepRecord> sleepRecords;
   final List<Expense> expenses;
-  final SavingsGoal? savingsGoal;
+  final List<SavingsGoal> savingsGoals;
   final Function(int) onToggleTask;
   final bool isDarkMode;
   final VoidCallback onToggleTheme;
-  final int reminderMinutes;
-  final ValueChanged<int> onReminderMinutesChanged;
 
   const HomePage({
     super.key,
@@ -24,12 +22,10 @@ class HomePage extends StatelessWidget {
     required this.tasks,
     required this.sleepRecords,
     required this.expenses,
-    required this.savingsGoal,
+    required this.savingsGoals,
     required this.onToggleTask,
     required this.isDarkMode,
     required this.onToggleTheme,
-    required this.reminderMinutes,
-    required this.onReminderMinutesChanged,
   });
 
   void showSettingsDialog(BuildContext context) {
@@ -53,34 +49,6 @@ class HomePage extends StatelessWidget {
                     onToggleTheme();
                     Navigator.pop(dialogContext);
                   },
-                ),
-                const Divider(),
-                const SizedBox(height: 8),
-                const Text(
-                  'Reminder lead time',
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 8),
-                RadioGroup<int>(
-                  groupValue: reminderMinutes,
-                  onChanged: (value) {
-                    if (value != null) {
-                      onReminderMinutesChanged(value);
-                    }
-                    Navigator.pop(dialogContext);
-                  },
-                  child: Column(
-                    children: [5, 10, 15, 30]
-                        .map(
-                          (minutes) => RadioListTile<int>(
-                            dense: true,
-                            contentPadding: EdgeInsets.zero,
-                            title: Text('$minutes minutes'),
-                            value: minutes,
-                          ),
-                        )
-                        .toList(),
-                  ),
                 ),
                 const Divider(),
                 ListTile(
@@ -264,8 +232,14 @@ class HomePage extends StatelessWidget {
     final today = DateTime.now();
 
     final todayTasks = tasks
-        .where((task) => DateUtils.isSameDay(task.dueDate, today))
+        .where((task) {
+          final d = task.displayDate;
+          return d != null && DateUtils.isSameDay(d, today);
+        })
         .toList();
+    final floatingCount = tasks
+        .where((task) => task.isFloating && !task.completed)
+        .length;
 
     final completedTasks = todayTasks.where((task) => task.completed).length;
 
@@ -740,6 +714,28 @@ class HomePage extends StatelessWidget {
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                   const Spacer(),
+                  if (floatingCount > 0)
+                    Container(
+                      margin: const EdgeInsets.only(right: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.primary.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '$floatingCount floating',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                    ),
                   Text(
                     '$completedTasks/${todayTasks.length}',
                     style: TextStyle(
@@ -753,7 +749,12 @@ class HomePage extends StatelessWidget {
               const SizedBox(height: 12),
 
               if (todayTasks.isEmpty)
-                _emptyCard(context, 'No tasks due today.'),
+                _emptyCard(
+                  context,
+                  floatingCount > 0
+                      ? 'No tasks due today.\n$floatingCount floating task(s) waiting in Planner.'
+                      : 'No tasks due today.',
+                ),
 
               ...todayTasks
                   .take(4)
@@ -788,7 +789,13 @@ class HomePage extends StatelessWidget {
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                          subtitle: Text(formatDate(task.dueDate)),
+                          subtitle: Text(
+                            task.doAt != null
+                                ? formatDateTime(task.doAt!)
+                                : task.dueDate != null
+                                    ? formatDate(task.dueDate!)
+                                    : 'Floating • no date',
+                          ),
                           controlAffinity: ListTileControlAffinity.leading,
                         ),
                       ),
@@ -833,70 +840,31 @@ class HomePage extends StatelessWidget {
               const SizedBox(height: 12),
 
               // -----------------------------------------------------------------
-              // Savings
+              // Savings (top-3 + view all)
               // -----------------------------------------------------------------
-              if (savingsGoal == null)
+              if (savingsGoals.isEmpty)
                 _emptyCard(
                   context,
                   'No savings goal yet.\nCreate one from Money.',
                 )
-              else
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(18),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 16,
-                              backgroundImage: savingsGoal!.imagePath == null
-                                  ? null
-                                  : FileImage(File(savingsGoal!.imagePath!)),
-                              child: savingsGoal!.imagePath == null
-                                  ? const Icon(Icons.savings_outlined, size: 16)
-                                  : null,
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                savingsGoal!.name,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ),
-                            Text(
-                              '${(savingsGoal!.progress * 100).round()}%',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.primary,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 14),
-
-                        LinearProgressIndicator(
-                          value: savingsGoal!.progress,
-                          minHeight: 8,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-
-                        const SizedBox(height: 10),
-
-                        Text(
-                          'RM${savingsGoal!.currentAmount.toStringAsFixed(2)} '
-                          '/ RM${savingsGoal!.targetAmount.toStringAsFixed(2)}',
-                          style: TextStyle(color: Colors.grey.shade600),
-                        ),
-                      ],
+              else ...[
+                for (final goal in savingsGoals.take(3))
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _savingsPreviewCard(context, goal),
+                  ),
+                if (savingsGoals.length > 3)
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () => _showAllSavings(context),
+                      icon: const Icon(Icons.savings_outlined, size: 18),
+                      label: Text(
+                        'View all (${savingsGoals.length})',
+                      ),
                     ),
                   ),
-                ),
+              ],
             ],
           ),
         ),
@@ -981,6 +949,93 @@ class HomePage extends StatelessWidget {
             style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showAllSavings(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            children: [
+              const ListTile(
+                title: Text(
+                  'All savings goals',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+              for (final goal in savingsGoals)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: _savingsPreviewCard(sheetContext, goal),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _savingsPreviewCard(BuildContext context, SavingsGoal goal) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 16,
+                  backgroundImage: goal.imagePath == null
+                      ? null
+                      : FileImage(File(goal.imagePath!)),
+                  child: goal.imagePath == null
+                      ? const Icon(Icons.savings_outlined, size: 16)
+                      : null,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    goal.name,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+                Text(
+                  '${(goal.progress * 100).round()}%',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 14),
+
+            LinearProgressIndicator(
+              value: goal.progress,
+              minHeight: 8,
+              borderRadius: BorderRadius.circular(10),
+            ),
+
+            const SizedBox(height: 10),
+
+            Text(
+              'RM${goal.currentAmount.toStringAsFixed(2)} '
+              '/ RM${goal.targetAmount.toStringAsFixed(2)}',
+              style: TextStyle(color: Colors.grey.shade600),
+            ),
+          ],
+        ),
       ),
     );
   }

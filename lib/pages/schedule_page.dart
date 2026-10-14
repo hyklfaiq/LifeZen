@@ -2079,6 +2079,9 @@ class _ScheduleEditorDialogState extends State<_ScheduleEditorDialog> {
   /// "No fixed time" section and the time/repeat controls are hidden.
   bool noFixedTime = false;
 
+  /// Per-item reminder: null = use the schedule default, -1 = none.
+  int? reminderMinutes;
+
   @override
   void initState() {
     super.initState();
@@ -2086,6 +2089,9 @@ class _ScheduleEditorDialogState extends State<_ScheduleEditorDialog> {
     final existing = widget.existing;
 
     noFixedTime = existing != null && !existing.hasTime;
+    // Schedules default to 10 min before; null legacy data also
+    // resolves to 10 so old items keep notifying.
+    reminderMinutes = existing?.reminderMinutes ?? 10;
 
     titleController = TextEditingController(text: existing?.title ?? '');
 
@@ -2287,6 +2293,7 @@ class _ScheduleEditorDialogState extends State<_ScheduleEditorDialog> {
       lecturer: lecturer.isEmpty ? null : lecturer,
       section: section.isEmpty ? null : section,
       semester: semester.isEmpty ? null : semester,
+      reminderMinutes: reminderMinutes,
     );
 
     Navigator.of(context).pop(item);
@@ -2487,6 +2494,29 @@ class _ScheduleEditorDialogState extends State<_ScheduleEditorDialog> {
                 ),
 
                 const SizedBox(height: 8),
+
+                // ---------------------------------------------------------------
+                // REMINDER (preset + custom, per item)
+                // ---------------------------------------------------------------
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Reminder',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+
+                const SizedBox(height: 8),
+
+                ReminderPicker(
+                  value: reminderMinutes,
+                  allowUseDefault: false,
+                  onChanged: (v) => setState(
+                    () => reminderMinutes = v ?? 10,
+                  ),
+                ),
+
+                const SizedBox(height: 12),
 
                 // ---------------------------------------------------------------
                 // REPEAT

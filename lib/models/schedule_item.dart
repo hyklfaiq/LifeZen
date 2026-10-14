@@ -19,6 +19,11 @@ class ScheduleItem {
   /// instead of being placed on the hourly grid.
   final bool hasTime;
 
+  /// Per-item reminder override in minutes before start.
+  /// `null` = use the global schedule default.
+  /// `-1` = no reminder for this item.
+  final int? reminderMinutes;
+
   ScheduleItem({
     required this.id,
     required this.title,
@@ -33,6 +38,7 @@ class ScheduleItem {
     this.section,
     this.semester,
     this.hasTime = true,
+    this.reminderMinutes,
   });
 
   Map<String, dynamic> toMap() {
@@ -52,6 +58,7 @@ class ScheduleItem {
       if (section != null) 'section': section,
       if (semester != null) 'semester': semester,
       'hasTime': hasTime,
+      if (reminderMinutes != null) 'reminderMinutes': reminderMinutes,
     };
   }
 
@@ -71,6 +78,13 @@ class ScheduleItem {
             minute: startTime.minute,
           );
 
+    int? parseReminder(dynamic value) {
+      if (value == null) return null;
+      if (value is int) return value;
+      if (value is num) return value.toInt();
+      return int.tryParse(value.toString());
+    }
+
     return ScheduleItem(
       id: map['id'] as int,
       title: map['title'] as String,
@@ -85,6 +99,7 @@ class ScheduleItem {
       section: map['section']?.toString(),
       semester: map['semester'] as String?,
       hasTime: map['hasTime'] as bool? ?? true,
+      reminderMinutes: parseReminder(map['reminderMinutes']),
     );
   }
 }

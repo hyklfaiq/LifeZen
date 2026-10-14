@@ -34,8 +34,14 @@ class MoneyPage extends StatelessWidget {
   })
   onEditSavings;
 
-  // Add/remove money from a specific goal
-  final Future<void> Function(String id, double amount) onAddSavings;
+  // Add/remove money from a specific goal.
+  // `countAsSpending` controls whether an Add transfer also reduces the
+  // remaining budget (recorded as a Transfer expense).
+  final Future<void> Function(
+    String id,
+    double amount, {
+    bool countAsSpending,
+  }) onAddSavings;
   final Future<void> Function(String id, double amount) onRemoveSavings;
 
   // Delete a specific goal
@@ -62,6 +68,10 @@ class MoneyPage extends StatelessWidget {
       0,
       (sum, expense) => sum + expense.amount,
     );
+
+    final transferredThisMonth = expenses
+        .where((expense) => expense.category == 'Transfer')
+        .fold<double>(0, (sum, expense) => sum + expense.amount);
 
     final remaining = monthlyBudget - totalSpent;
     final weeklyBudget = monthlyBudget / 4;
@@ -143,6 +153,16 @@ class MoneyPage extends StatelessWidget {
                         ),
                       ],
                     ),
+                    if (transferredThisMonth > 0) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        'Includes RM${transferredThisMonth.toStringAsFixed(2)} transferred to savings',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -271,17 +291,31 @@ class MoneyPage extends StatelessWidget {
             const SizedBox(height: 12),
 
             // ============================================================
-            // SAVINGS GOALS
+            // SAVINGS GOALS (top-3 + view all)
             // ============================================================
             if (savingsGoals.isEmpty)
               _buildEmptySavings(context)
-            else
-              ...savingsGoals.map(
-                (goal) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _buildSavingsCard(context, goal),
+            else ...[
+              ...savingsGoals
+                  .take(3)
+                  .map(
+                    (goal) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _buildSavingsCard(context, goal),
+                    ),
+                  ),
+              if (savingsGoals.length > 3)
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _showAllSavings(context),
+                    icon: const Icon(Icons.savings_outlined, size: 18),
+                    label: Text(
+                      'View all (${savingsGoals.length})',
+                    ),
+                  ),
                 ),
-              ),
+            ],
           ],
         ),
       ),
@@ -561,15 +595,50 @@ class MoneyPage extends StatelessWidget {
     BuildContext context,
     SavingsGoal goal,
   ) async {
-    final result = await showDialog<double>(
+    final result = await showDialog<_TransferDialogResult>(
       context: context,
-      builder: (_) =>
-          const _SavingsAmountDialog(title: 'Add Savings', buttonText: 'Add'),
+      builder: (_) => const _SavingsAmountDialog(
+        title: 'Add Savings',
+        buttonText: 'Add',
+        showBudgetToggle: true,
+      ),
     );
 
     if (result != null) {
-      await onAddSavings(goal.id, result);
+      await onAddSavings(
+        goal.id,
+        result.amount,
+        countAsSpending: result.countAsSpending,
+      );
     }
+  }
+
+  void _showAllSavings(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            children: [
+              const ListTile(
+                title: Text(
+                  'All savings goals',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+              for (final goal in savingsGoals)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _buildSavingsCard(sheetContext, goal),
+                ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   // ================================================================
@@ -580,7 +649,7 @@ class MoneyPage extends StatelessWidget {
     BuildContext context,
     SavingsGoal goal,
   ) async {
-    final result = await showDialog<double>(
+    final result = await showDialog<_TransferDialogResult>(
       context: context,
       builder: (_) => const _SavingsAmountDialog(
         title: 'Remove Savings',
@@ -589,7 +658,7 @@ class MoneyPage extends StatelessWidget {
     );
 
     if (result != null) {
-      await onRemoveSavings(goal.id, result);
+      await onRemoveSavings(goal.id, result.amount);
     }
   }
 
@@ -732,6 +801,7 @@ class _AddExpenseDialogState extends State<_AddExpenseDialog> {
                 ),
                 DropdownMenuItem(value: 'Shopping', child: Text('Shopping')),
                 DropdownMenuItem(value: 'Bills', child: Text('Bills')),
+                DropdownMenuItem(value: 'Transfer', child: Text('Transfer')),
                 DropdownMenuItem(value: 'Other', child: Text('Other')),
               ],
               onChanged: (value) {
@@ -1025,11 +1095,26 @@ class _SavingsDialogState extends State<_SavingsDialog> {
 // ADD / REMOVE SAVINGS AMOUNT DIALOG
 // ============================================================================
 
+class _TransferDialogResult {
+  const _TransferDialogResult({
+    required this.amount,
+    required this.countAsSpending,
+  });
+
+  final double amount;
+  final bool countAsSpending;
+}
+
 class _SavingsAmountDialog extends StatefulWidget {
-  const _SavingsAmountDialog({required this.title, required this.buttonText});
+  const _SavingsAmountDialog({
+    required this.title,
+    required this.buttonText,
+    this.showBudgetToggle = false,
+  });
 
   final String title;
   final String buttonText;
+  final bool showBudgetToggle;
 
   @override
   State<_SavingsAmountDialog> createState() => _SavingsAmountDialogState();
@@ -1037,6 +1122,7 @@ class _SavingsAmountDialog extends StatefulWidget {
 
 class _SavingsAmountDialogState extends State<_SavingsAmountDialog> {
   late final TextEditingController _controller;
+  bool _countAsSpending = true;
 
   @override
   void initState() {
@@ -1059,23 +1145,59 @@ class _SavingsAmountDialogState extends State<_SavingsAmountDialog> {
       return;
     }
 
-    Navigator.of(context).pop(amount);
+    if (widget.showBudgetToggle) {
+      Navigator.of(context).pop(
+        _TransferDialogResult(
+          amount: amount,
+          countAsSpending: _countAsSpending,
+        ),
+      );
+    } else {
+      // Remove-flow still expects a plain double.
+      Navigator.of(context).pop(
+        _TransferDialogResult(amount: amount, countAsSpending: false),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
       title: Text(widget.title),
-      content: TextField(
-        controller: _controller,
-        autofocus: true,
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        textInputAction: TextInputAction.done,
-        decoration: const InputDecoration(
-          prefixText: 'RM ',
-          labelText: 'Amount',
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _controller,
+              autofocus: true,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              textInputAction: TextInputAction.done,
+              decoration: const InputDecoration(
+                prefixText: 'RM ',
+                labelText: 'Amount',
+              ),
+              onSubmitted: (_) => _submit(),
+            ),
+            if (widget.showBudgetToggle) ...[
+              const SizedBox(height: 12),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text(
+                  'Count as spending',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                subtitle: const Text(
+                  'Reduce remaining budget with a Transfer expense.',
+                ),
+                value: _countAsSpending,
+                onChanged: (v) => setState(() => _countAsSpending = v),
+              ),
+            ],
+          ],
         ),
-        onSubmitted: (_) => _submit(),
       ),
       actions: [
         TextButton(

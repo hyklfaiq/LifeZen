@@ -8,6 +8,7 @@ import 'pages/planner_page.dart';
 import 'pages/schedule_page.dart';
 import 'services/imaluum/imaluum_timetable.dart';
 import 'storage/app_storage.dart';
+import 'utils/app_helpers.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -257,18 +258,39 @@ class _MainScreenState extends State<MainScreen> {
   List<SavingsGoal> savingsGoals = [];
   double monthlyBudget = 800;
   int sleepGoalHours = 8;
-  int reminderMinutes = 10;
   int firstDayOfWeek = 1;
   int currentIndex = 0;
   bool isLoading = true;
   @override
   void initState() {
     super.initState();
+    // Tapping a reminder opens the tab it belongs to:
+    // `task:*` → Planner (1), `schedule:*` → Schedule (2).
+    NotificationService.onNotificationTap = _handleNotificationTap;
     _loadData();
+  }
+
+  void _handleNotificationTap(String? payload) {
+    if (payload == null) return;
+    final target = payload.startsWith('schedule') ? 2 : 1;
+    // Wait a frame: if the app was cold-started by the tap, the
+    // PageView may not have clients yet.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() => currentIndex = target);
+      if (pageController.hasClients) {
+        pageController.animateToPage(
+          target,
+          duration: const Duration(milliseconds: 350),
+          curve: Curves.easeOutCubic,
+        );
+      }
+    });
   }
 
   @override
   void dispose() {
+    NotificationService.onNotificationTap = null;
     pageController.dispose();
     super.dispose();
   }
@@ -288,14 +310,6 @@ class _MainScreenState extends State<MainScreen> {
     setState(() {});
   }
 
-  Future<void> updateReminderMinutes(int minutes) async {
-    reminderMinutes = minutes;
-    await AppStorage.saveReminderMinutes(minutes);
-    await _refreshNotifications();
-    if (!mounted) return;
-    setState(() {});
-  }
-
   Future<void> _loadData() async {
     final loadedTasks = await AppStorage.loadTasks();
     final loadedSleep = await AppStorage.loadSleepRecords();
@@ -303,7 +317,6 @@ class _MainScreenState extends State<MainScreen> {
     final loadedSchedule = await AppStorage.loadSchedule();
     final loadedSavings = await AppStorage.loadSavingsGoals();
     final loadedSleepGoal = await AppStorage.loadSleepGoal();
-    final loadedReminderMinutes = await AppStorage.loadReminderMinutes();
     final loadedBudget = await AppStorage.loadBudget();
     final loadedFirstDay = await AppStorage.loadFirstDayOfWeek();
     tasks = loadedTasks.map(Task.fromMap).toList();
@@ -314,12 +327,72 @@ class _MainScreenState extends State<MainScreen> {
     monthlyBudget = loadedBudget;
     firstDayOfWeek = loadedFirstDay;
     sleepGoalHours = loadedSleepGoal;
-    reminderMinutes = loadedReminderMinutes;
     if (!mounted) return;
     setState(() {
       isLoading = false;
     });
     await _refreshNotifications();
+  }
+
+  /// Resolve the effective lead time for a task:
+  /// explicit per-item value first, otherwise the smart default
+  /// for the task type (none / 9 AM due / 10-min-before scheduled).
+  int _effectiveTaskReminder(Task task) {
+    return task.effectiveReminderMinutes;
+  }
+
+  /// Schedules always default to 10 min before unless overridden.
+  /// `-1` means no reminder.
+  int _effectiveScheduleReminder(ScheduleItem item) {
+    if (item.reminderMinutes != null) return item.reminderMinutes!;
+    return 10;
+  }
+
+  Future<void> _scheduleTaskNotification(Task task) async {
+    final when = task.notifyAt;
+    if (task.completed || when == null) return;
+    final lead = _effectiveTaskReminder(task);
+    if (lead < 0) return;
+    try {
+      await NotificationService.scheduleTask(
+        id: _taskNotificationId(task.id),
+        title: task.title,
+        dateTime: when,
+        reminderMinutes: lead,
+        detail:
+            '${task.doAt != null ? 'Do at' : 'Due'} ${formatDateTime(when)}',
+        payload: 'task:${task.id}',
+      );
+      // When both dates are set the planned time drives the main
+      // reminder, so the deadline needs its own 9:00 AM notification.
+      final due = task.dueDate;
+      if (task.doAt != null && due != null) {
+        final dueAnchor = DateTime(due.year, due.month, due.day, 9, 0);
+        await NotificationService.scheduleTask(
+          id: _taskDueNotificationId(task.id),
+          title: task.title,
+          dateTime: dueAnchor,
+          // Smart default (null) = 9:00 AM sharp on the due date;
+          // an explicit lead applies to both anchors.
+          reminderMinutes: task.reminderMinutes ?? 0,
+          detail: 'Due ${formatDateTime(dueAnchor)}',
+          payload: 'task:${task.id}',
+        );
+      }
+    } catch (e) {
+      debugPrint('Failed to restore task notification: $e');
+    }
+  }
+
+  /// Cancels both the planned-time and due-date notifications of a task.
+  Future<void> _cancelTaskNotifications(int taskId) async {
+    for (final id in [_taskNotificationId(taskId), _taskDueNotificationId(taskId)]) {
+      try {
+        await NotificationService.cancel(id);
+      } catch (e) {
+        debugPrint('Failed to cancel task notification: $e');
+      }
+    }
   }
 
   Future<void> _refreshNotifications() async {
@@ -329,20 +402,11 @@ class _MainScreenState extends State<MainScreen> {
       debugPrint('Failed to clear notifications: $e');
     }
     for (final task in tasks) {
-      if (!task.completed) {
-        try {
-          await NotificationService.scheduleTask(
-            id: _taskNotificationId(task.id),
-            title: task.title,
-            dateTime: task.dueDate,
-            reminderMinutes: reminderMinutes,
-          );
-        } catch (e) {
-          debugPrint('Failed to restore task notification: $e');
-        }
-      }
+      await _scheduleTaskNotification(task);
     }
     for (final item in schedule) {
+      final lead = _effectiveScheduleReminder(item);
+      if (lead < 0) continue;
       for (final day in item.repeatDays) {
         try {
           await NotificationService.scheduleWeekly(
@@ -351,7 +415,9 @@ class _MainScreenState extends State<MainScreen> {
             weekday: day,
             hour: item.time.hour,
             minute: item.time.minute,
-            reminderMinutes: reminderMinutes,
+            reminderMinutes: lead,
+            detail: _scheduleDetail(item),
+            payload: 'schedule:${item.id}:$day',
           );
         } catch (e) {
           debugPrint('Failed to restore schedule notification: $e');
@@ -363,8 +429,44 @@ class _MainScreenState extends State<MainScreen> {
   int _scheduleNotificationId(int scheduleId, int weekday) {
     return (scheduleId % 1000000) * 10 + weekday;
   }
+
+  /// Notification body for a schedule item: start time + venue when known.
+  String _scheduleDetail(ScheduleItem item) {
+    final start = 'Starts ${formatTimeOfDay(item.time)}';
+    final venue = item.venue;
+    if (venue == null || venue.isEmpty) return start;
+    return '$start • $venue';
+  }
   int _taskNotificationId(int taskId) {
     return 2000000000 + (taskId % 100000000);
+  }
+
+  /// Second id for the due-date notification of a task that also has a
+  /// planned time. Separate 3xxx… range so it never collides with the
+  /// primary id or the schedule ids.
+  int _taskDueNotificationId(int taskId) {
+    return 3000000000 + (taskId % 100000000);
+  }
+
+  Future<void> _scheduleWeeklyItem(ScheduleItem item) async {
+    final lead = _effectiveScheduleReminder(item);
+    if (lead < 0) return;
+    for (final day in item.repeatDays) {
+      try {
+        await NotificationService.scheduleWeekly(
+          id: _scheduleNotificationId(item.id, day),
+          title: item.title,
+          weekday: day,
+          hour: item.time.hour,
+          minute: item.time.minute,
+          reminderMinutes: lead,
+          detail: _scheduleDetail(item),
+          payload: 'schedule:${item.id}:$day',
+        );
+      } catch (e) {
+        debugPrint('Schedule notification failed: $e');
+      }
+    }
   }
 
   Future<void> addSchedule(ScheduleItem item) async {
@@ -382,6 +484,7 @@ class _MainScreenState extends State<MainScreen> {
       section: item.section,
       semester: item.semester,
       hasTime: item.hasTime,
+      reminderMinutes: item.reminderMinutes,
     );
     schedule.add(newItem);
     if (mounted) {
@@ -390,20 +493,7 @@ class _MainScreenState extends State<MainScreen> {
     await AppStorage.saveSchedule(
       schedule.map((item) => item.toMap()).toList(),
     );
-    for (final day in newItem.repeatDays) {
-      try {
-        await NotificationService.scheduleWeekly(
-          id: _scheduleNotificationId(newItem.id, day),
-          title: newItem.title,
-          weekday: day,
-          hour: newItem.time.hour,
-          minute: newItem.time.minute,
-          reminderMinutes: reminderMinutes,
-        );
-      } catch (e) {
-        debugPrint('Schedule notification failed: $e');
-      }
-    }
+    await _scheduleWeeklyItem(newItem);
   }
 
   Future<int> importImaluumSchedule(List<ImaluumMeeting> meetings) async {
@@ -448,20 +538,7 @@ class _MainScreenState extends State<MainScreen> {
       schedule.map((item) => item.toMap()).toList(),
     );
     for (final item in added) {
-      for (final day in item.repeatDays) {
-        try {
-          await NotificationService.scheduleWeekly(
-            id: _scheduleNotificationId(item.id, day),
-            title: item.title,
-            weekday: day,
-            hour: item.time.hour,
-            minute: item.time.minute,
-            reminderMinutes: reminderMinutes,
-          );
-        } catch (e) {
-          debugPrint('Imported schedule notification failed: $e');
-        }
-      }
+      await _scheduleWeeklyItem(item);
     }
     return added.length;
   }
@@ -495,6 +572,7 @@ class _MainScreenState extends State<MainScreen> {
       section: updatedItem.section,
       semester: updatedItem.semester,
       hasTime: updatedItem.hasTime,
+      reminderMinutes: updatedItem.reminderMinutes,
     );
     if (mounted) {
       setState(() {});
@@ -502,20 +580,7 @@ class _MainScreenState extends State<MainScreen> {
     await AppStorage.saveSchedule(
       schedule.map((item) => item.toMap()).toList(),
     );
-    for (final day in updatedItem.repeatDays) {
-      try {
-        await NotificationService.scheduleWeekly(
-          id: _scheduleNotificationId(updatedItem.id, day),
-          title: updatedItem.title,
-          weekday: day,
-          hour: updatedItem.time.hour,
-          minute: updatedItem.time.minute,
-          reminderMinutes: reminderMinutes,
-        );
-      } catch (e) {
-        debugPrint('Updated schedule notification failed: $e');
-      }
-    }
+    await _scheduleWeeklyItem(schedule[index]);
   }
 
   Future<void> deleteSchedule(int id) async {
@@ -562,16 +627,31 @@ class _MainScreenState extends State<MainScreen> {
       id: DateTime.now().microsecondsSinceEpoch,
       title: task.title,
       dueDate: task.dueDate,
+      doAt: task.doAt,
+      reminderMinutes: task.reminderMinutes,
       completed: false,
     );
     tasks.add(newTask);
     await AppStorage.saveTasks(tasks.map((task) => task.toMap()).toList());
-    await NotificationService.scheduleTask(
-      id: _taskNotificationId(newTask.id),
-      title: newTask.title,
-      dateTime: newTask.dueDate,
-      reminderMinutes: reminderMinutes,
+    await _scheduleTaskNotification(newTask);
+    if (!mounted) return;
+    setState(() {});
+  }
+
+  Future<void> updateTask(Task updated) async {
+    final index = tasks.indexWhere((task) => task.id == updated.id);
+    if (index == -1) return;
+    tasks[index] = Task(
+      id: updated.id,
+      title: updated.title,
+      dueDate: updated.dueDate,
+      doAt: updated.doAt,
+      reminderMinutes: updated.reminderMinutes,
+      completed: tasks[index].completed,
     );
+    await AppStorage.saveTasks(tasks.map((task) => task.toMap()).toList());
+    await _cancelTaskNotifications(updated.id);
+    await _scheduleTaskNotification(tasks[index]);
     if (!mounted) return;
     setState(() {});
   }
@@ -586,14 +666,9 @@ class _MainScreenState extends State<MainScreen> {
     }
     try {
       if (task.completed) {
-        await NotificationService.cancel(_taskNotificationId(task.id));
+        await _cancelTaskNotifications(task.id);
       } else {
-        await NotificationService.scheduleTask(
-          id: _taskNotificationId(task.id),
-          title: task.title,
-          dateTime: task.dueDate,
-          reminderMinutes: reminderMinutes,
-        );
+        await _scheduleTaskNotification(task);
       }
     } catch (e) {
       debugPrint('Failed to update task notification: $e');
@@ -620,11 +695,7 @@ class _MainScreenState extends State<MainScreen> {
       debugPrint('Failed to save task deletion: $e');
     }
 
-    try {
-      await NotificationService.cancel(_taskNotificationId(taskId));
-    } catch (e) {
-      debugPrint('Failed to cancel task notification: $e');
-    }
+    await _cancelTaskNotifications(taskId);
   }
 
   Future<void> addSleepRecord(SleepRecord record) async {
@@ -728,7 +799,11 @@ class _MainScreenState extends State<MainScreen> {
     setState(() {});
   }
 
-  Future<void> addSavings(String id, double amount) async {
+  Future<void> addSavings(
+    String id,
+    double amount, {
+    bool countAsSpending = true,
+  }) async {
     final index = savingsGoals.indexWhere((goal) => goal.id == id);
     if (index == -1) return;
     final goal = savingsGoals[index];
@@ -739,6 +814,21 @@ class _MainScreenState extends State<MainScreen> {
     await AppStorage.saveSavingsGoals(
       savingsGoals.map((goal) => goal.toMap()).toList(),
     );
+    // Transfers reduce the remaining budget: record them as an expense
+    // so `remaining = budget - spent` stays correct in one place.
+    if (countAsSpending && amount > 0) {
+      final transfer = Expense(
+        id: DateTime.now().microsecondsSinceEpoch,
+        title: 'Transfer to ${goal.name}',
+        amount: amount,
+        category: 'Transfer',
+        date: DateTime.now(),
+      );
+      expenses.insert(0, transfer);
+      await AppStorage.saveExpenses(
+        expenses.map((expense) => expense.toMap()).toList(),
+      );
+    }
     if (!mounted) return;
     setState(() {});
   }
@@ -778,16 +868,15 @@ class _MainScreenState extends State<MainScreen> {
         tasks: tasks,
         sleepRecords: sleepRecords,
         expenses: expenses,
-        savingsGoal: savingsGoals.isEmpty ? null : savingsGoals.first,
+        savingsGoals: savingsGoals,
         onToggleTask: toggleTask,
         isDarkMode: widget.isDarkMode,
         onToggleTheme: widget.onToggleTheme,
-        reminderMinutes: reminderMinutes,
-        onReminderMinutesChanged: updateReminderMinutes,
       ),
       PlannerPage(
         tasks: tasks,
         onAddTask: addTask,
+        onUpdateTask: updateTask,
         onToggleTask: toggleTask,
         onDeleteTask: deleteTask,
       ),

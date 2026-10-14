@@ -1,10 +1,23 @@
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
 class NotificationService {
   static final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
+
+  /// Invoked when the user taps a scheduled notification.
+  /// The payload format is set by scheduleTask / scheduleWeekly callers:
+  /// `task:<id>` or `schedule:<id>:<weekday>`.
+  static void Function(String? payload)? onNotificationTap;
+
+  /// Exact alarms keep reminders on time (Android can batch/delay
+  /// inexact ones by 15-30 min in Doze). Downgraded to inexact if the
+  /// OS denies or later revokes the permission.
+  static AndroidScheduleMode _scheduleMode =
+      AndroidScheduleMode.inexactAllowWhileIdle;
 
   static const NotificationDetails _notificationDetails = NotificationDetails(
     android: AndroidNotificationDetails(
@@ -19,13 +32,27 @@ class NotificationService {
   static Future<void> init() async {
     tz.initializeTimeZones();
 
-    tz.setLocalLocation(tz.getLocation('Asia/Kuala_Lumpur'));
+    // Use the device's real timezone so travelling users still get
+    // reminders at the right local time; fall back to Kuala Lumpur
+    // when the platform reports an ID the timezone DB lacks
+    // (older Android returns raw "GMT+08:00"-style strings).
+    try {
+      final deviceTz = await FlutterTimezone.getLocalTimezone();
+      tz.setLocalLocation(tz.getLocation(deviceTz.identifier));
+    } catch (_) {
+      tz.setLocalLocation(tz.getLocation('Asia/Kuala_Lumpur'));
+    }
 
     const settings = InitializationSettings(
       android: AndroidInitializationSettings('@mipmap/ic_launcher'),
     );
 
-    await _plugin.initialize(settings: settings);
+    await _plugin.initialize(
+      settings: settings,
+      onDidReceiveNotificationResponse: (response) {
+        onNotificationTap?.call(response.payload);
+      },
+    );
 
     final androidPlugin = _plugin
         .resolvePlatformSpecificImplementation<
@@ -33,6 +60,17 @@ class NotificationService {
         >();
 
     await androidPlugin?.requestNotificationsPermission();
+
+    // Prefer exact alarms so reminders arrive on time; the OS may deny
+    // them (permission revoked by the user) — then keep inexact mode.
+    try {
+      final canExact = await androidPlugin?.canScheduleExactNotifications();
+      if (canExact == true) {
+        _scheduleMode = AndroidScheduleMode.exactAllowWhileIdle;
+      }
+    } catch (_) {
+      // Older OS or plugin without the API — inexact mode stays.
+    }
   }
 
   // ==========================================================
@@ -56,21 +94,24 @@ class NotificationService {
     required int id,
     required String title,
     required DateTime dateTime,
-    int reminderMinutes = 10,
+    int? reminderMinutes = 10,
+    String? payload,
+    String? detail,
   }) async {
+    // null / negative = no reminder for this item.
+    if (reminderMinutes == null || reminderMinutes < 0) return;
     final reminder = dateTime.subtract(Duration(minutes: reminderMinutes));
 
     if (!reminder.isAfter(DateTime.now())) {
       return;
     }
 
-    await _plugin.zonedSchedule(
+    await _schedule(
       id: id,
-      title: 'Upcoming task',
-      body: title,
+      title: title,
+      body: detail ?? 'Reminder',
       scheduledDate: tz.TZDateTime.from(reminder, tz.local),
-      notificationDetails: _notificationDetails,
-      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      payload: payload,
     );
   }
 
@@ -84,8 +125,12 @@ class NotificationService {
     required int weekday,
     required int hour,
     required int minute,
-    int reminderMinutes = 10,
+    int? reminderMinutes = 10,
+    String? payload,
+    String? detail,
   }) async {
+    // null / negative = no reminder for this item.
+    if (reminderMinutes == null || reminderMinutes < 0) return;
     final now = tz.TZDateTime.now(tz.local);
 
     int daysUntil = weekday - now.weekday;
@@ -114,10 +159,12 @@ class NotificationService {
       scheduled = scheduled.add(const Duration(days: 7));
     }
 
-    await _plugin.zonedSchedule(
+    await _schedule(
       id: id,
-      title: 'Upcoming schedule',
-      body: title,
+      title: title,
+      body: detail ??
+          'Starts ${hour.toString().padLeft(2, '0')}:'
+              '${minute.toString().padLeft(2, '0')}',
       scheduledDate: tz.TZDateTime(
         tz.local,
         scheduled.year,
@@ -126,10 +173,47 @@ class NotificationService {
         scheduled.hour,
         scheduled.minute,
       ).subtract(Duration(minutes: reminderMinutes)),
-      notificationDetails: _notificationDetails,
-      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      payload: payload,
       matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
     );
+  }
+
+  // ==========================================================
+  // SCHEDULER (exact first, inexact fallback)
+  // ==========================================================
+
+  static Future<void> _schedule({
+    required int id,
+    required String title,
+    required String body,
+    required tz.TZDateTime scheduledDate,
+    String? payload,
+    DateTimeComponents? matchDateTimeComponents,
+  }) async {
+    Future<void> schedule(AndroidScheduleMode mode) {
+      return _plugin.zonedSchedule(
+        id: id,
+        title: title,
+        body: body,
+        scheduledDate: scheduledDate,
+        notificationDetails: _notificationDetails,
+        androidScheduleMode: mode,
+        matchDateTimeComponents: matchDateTimeComponents,
+        payload: payload,
+      );
+    }
+
+    try {
+      await schedule(_scheduleMode);
+    } on PlatformException {
+      // Exact-alarm permission denied or revoked — downgrade permanently
+      // for this session so every later schedule still succeeds.
+      _scheduleMode = AndroidScheduleMode.inexactAllowWhileIdle;
+      await schedule(_scheduleMode);
+    } catch (e) {
+      // Last resort: a late reminder beats no reminder.
+      await schedule(AndroidScheduleMode.inexactAllowWhileIdle);
+    }
   }
 
   // ==========================================================
