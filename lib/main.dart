@@ -16,6 +16,28 @@ Future<void> main() async {
   runApp(const LifeZenApp());
 }
 
+//theme & color scheme helpers
+InputDecorationTheme _inputTheme(ColorScheme scheme) {
+  return InputDecorationTheme(
+    filled: true,
+    fillColor: scheme.surfaceContainerHighest.withValues(alpha: 0.45),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: BorderSide.none,
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: BorderSide(color: scheme.outlineVariant),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: BorderSide(color: scheme.primary, width: 1.8),
+    ),
+    labelStyle: TextStyle(color: scheme.onSurfaceVariant),
+  );
+}
+
 class LifeZenApp extends StatefulWidget {
   const LifeZenApp({super.key});
   @override
@@ -80,6 +102,7 @@ class _LifeZenAppState extends State<LifeZenApp> {
         brightness: Brightness.light,
         useMaterial3: true,
         colorScheme: lightScheme,
+        inputDecorationTheme: _inputTheme(lightScheme),
         scaffoldBackgroundColor: const Color(0xFFF4F6FB),
         cardTheme: CardThemeData(
           elevation: 0,
@@ -110,6 +133,7 @@ class _LifeZenAppState extends State<LifeZenApp> {
         brightness: Brightness.dark,
         useMaterial3: true,
         colorScheme: darkScheme,
+        inputDecorationTheme: _inputTheme(darkScheme),
         scaffoldBackgroundColor: const Color(0xFF0B1220),
         cardTheme: CardThemeData(
           elevation: 0,
@@ -256,7 +280,10 @@ class _MainScreenState extends State<MainScreen> {
   List<Expense> expenses = [];
   List<ScheduleItem> schedule = [];
   List<SavingsGoal> savingsGoals = [];
-  double monthlyBudget = 800;
+  // Selected month for the Money page (defaults to the current month).
+  DateTime selectedMonth = DateTime(DateTime.now().year, DateTime.now().month);
+  // Per-month budgets, keyed 'yyyy-MM'.
+  Map<String, double> monthlyBudgets = {};
   int sleepGoalHours = 8;
   int firstDayOfWeek = 1;
   int currentIndex = 0;
@@ -267,7 +294,9 @@ class _MainScreenState extends State<MainScreen> {
     // Tapping a reminder opens the tab it belongs to:
     // `task:*` → Planner (1), `schedule:*` → Schedule (2).
     NotificationService.onNotificationTap = _handleNotificationTap;
-    _loadData();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadData();
+    });
   }
 
   void _handleNotificationTap(String? payload) {
@@ -317,14 +346,17 @@ class _MainScreenState extends State<MainScreen> {
     final loadedSchedule = await AppStorage.loadSchedule();
     final loadedSavings = await AppStorage.loadSavingsGoals();
     final loadedSleepGoal = await AppStorage.loadSleepGoal();
-    final loadedBudget = await AppStorage.loadBudget();
+
+    // Monthly budgets: single serialized map, one entry per month.
+    // Missing month = no budget configured (no carry-forward).
+    monthlyBudgets = await AppStorage.loadMonthlyBudgetMap() ?? {};
+
     final loadedFirstDay = await AppStorage.loadFirstDayOfWeek();
     tasks = loadedTasks.map(Task.fromMap).toList();
     sleepRecords = loadedSleep.map(SleepRecord.fromMap).toList();
     expenses = loadedExpenses.map(Expense.fromMap).toList();
     schedule = loadedSchedule.map(ScheduleItem.fromMap).toList();
     savingsGoals = loadedSavings.map(SavingsGoal.fromMap).toList();
-    monthlyBudget = loadedBudget;
     firstDayOfWeek = loadedFirstDay;
     sleepGoalHours = loadedSleepGoal;
     if (!mounted) return;
@@ -386,7 +418,10 @@ class _MainScreenState extends State<MainScreen> {
 
   /// Cancels both the planned-time and due-date notifications of a task.
   Future<void> _cancelTaskNotifications(int taskId) async {
-    for (final id in [_taskNotificationId(taskId), _taskDueNotificationId(taskId)]) {
+    for (final id in [
+      _taskNotificationId(taskId),
+      _taskDueNotificationId(taskId),
+    ]) {
       try {
         await NotificationService.cancel(id);
       } catch (e) {
@@ -437,6 +472,7 @@ class _MainScreenState extends State<MainScreen> {
     if (venue == null || venue.isEmpty) return start;
     return '$start • $venue';
   }
+
   int _taskNotificationId(int taskId) {
     return 2000000000 + (taskId % 100000000);
   }
@@ -506,7 +542,8 @@ class _MainScreenState extends State<MainScreen> {
       // section and venue stay in their own fields instead of being
       // crammed into the title.
       final start = meeting.start ?? const TimeOfDay(hour: 9, minute: 0);
-      final end = meeting.end ??
+      final end =
+          meeting.end ??
           TimeOfDay(
             hour: start.hour < 23 ? start.hour + 1 : 23,
             minute: start.minute,
@@ -731,9 +768,7 @@ class _MainScreenState extends State<MainScreen> {
       date: expense.date,
     );
     expenses.insert(0, newExpense);
-    await AppStorage.saveExpenses(
-      expenses.map((expense) => expense.toMap()).toList(),
-    );
+    await AppStorage.saveExpenses(expenses.map((e) => e.toMap()).toList());
     if (!mounted) return;
     setState(() {});
   }
@@ -747,9 +782,16 @@ class _MainScreenState extends State<MainScreen> {
     setState(() {});
   }
 
-  Future<void> updateBudget(double amount) async {
-    monthlyBudget = amount;
-    await AppStorage.saveBudget(amount);
+  void setSelectedMonth(DateTime month) {
+    selectedMonth = DateTime(month.year, month.month);
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<void> updateMonthlyBudget(String monthKey, double amount) async {
+    monthlyBudgets[monthKey] = amount;
+    await AppStorage.saveMonthlyBudget(monthKey, amount);
     if (!mounted) return;
     setState(() {});
   }
@@ -899,11 +941,13 @@ class _MainScreenState extends State<MainScreen> {
       ),
       MoneyPage(
         expenses: expenses,
-        monthlyBudget: monthlyBudget,
+        selectedMonth: selectedMonth,
+        monthlyBudgets: monthlyBudgets,
         savingsGoals: savingsGoals,
         onAddExpense: addExpense,
         onDeleteExpense: deleteExpense,
-        onUpdateBudget: updateBudget,
+        onMonthChanged: setSelectedMonth,
+        onUpdateMonthlyBudget: updateMonthlyBudget,
         onCreateSavings: saveSavingsGoal,
         onEditSavings: editSavingsGoal,
         onAddSavings: addSavings,

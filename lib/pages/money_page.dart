@@ -5,17 +5,27 @@ import 'package:image_picker/image_picker.dart';
 
 import '../models/models.dart';
 import '../utils/app_helpers.dart';
+import '../utils/budget_calculator.dart';
 
 class MoneyPage extends StatelessWidget {
   final List<Expense> expenses;
-  final double monthlyBudget;
+
+  /// Month currently displayed, owned by MainScreen (defaults to now).
+  final DateTime selectedMonth;
+
+  /// Per-month budgets keyed 'yyyy-MM'. Missing entry = no budget.
+  final Map<String, double> monthlyBudgets;
 
   // Multiple savings goals
   final List<SavingsGoal> savingsGoals;
 
   final Function(Expense) onAddExpense;
   final Function(int) onDeleteExpense;
-  final Function(double) onUpdateBudget;
+
+  /// Month navigation + per-month budget writes (owned by MainScreen).
+  final ValueChanged<DateTime> onMonthChanged;
+  final Future<void> Function(String monthKey, double amount)
+  onUpdateMonthlyBudget;
 
   // Create a new savings goal
   final Future<void> Function({
@@ -37,11 +47,8 @@ class MoneyPage extends StatelessWidget {
   // Add/remove money from a specific goal.
   // `countAsSpending` controls whether an Add transfer also reduces the
   // remaining budget (recorded as a Transfer expense).
-  final Future<void> Function(
-    String id,
-    double amount, {
-    bool countAsSpending,
-  }) onAddSavings;
+  final Future<void> Function(String id, double amount, {bool countAsSpending})
+  onAddSavings;
   final Future<void> Function(String id, double amount) onRemoveSavings;
 
   // Delete a specific goal
@@ -50,11 +57,13 @@ class MoneyPage extends StatelessWidget {
   const MoneyPage({
     super.key,
     required this.expenses,
-    required this.monthlyBudget,
+    required this.selectedMonth,
+    required this.monthlyBudgets,
     required this.savingsGoals,
     required this.onAddExpense,
     required this.onDeleteExpense,
-    required this.onUpdateBudget,
+    required this.onMonthChanged,
+    required this.onUpdateMonthlyBudget,
     required this.onCreateSavings,
     required this.onEditSavings,
     required this.onAddSavings,
@@ -64,21 +73,35 @@ class MoneyPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final totalSpent = expenses.fold<double>(
-      0,
-      (sum, expense) => sum + expense.amount,
-    );
+    final key = formatMonthKey(selectedMonth);
+    final monthlyBudget = monthlyBudgets[key];
 
-    final transferredThisMonth = expenses
+    final monthExpenses = expenses
+        .where((expense) => formatMonthKey(expense.date) == key)
+        .toList();
+
+    // True when the viewed month has already ended, so the user can
+    // jump back to the current month instead of seeing a stale month.
+    final today = DateTime.now();
+    final isPastMonth =
+        selectedMonth.year < today.year ||
+        (selectedMonth.year == today.year && selectedMonth.month < today.month);
+
+    final totalSpent = monthlySpent(expenses, key);
+
+    final transferredThisMonth = monthExpenses
         .where((expense) => expense.category == 'Transfer')
         .fold<double>(0, (sum, expense) => sum + expense.amount);
 
-    final remaining = monthlyBudget - totalSpent;
-    final weeklyBudget = monthlyBudget / 4;
+    final remaining = monthlyBudget == null
+        ? null
+        : remainingBudget(monthlyBudget, totalSpent);
+    final weeklyBudget = monthlyBudget == null ? null : monthlyBudget / 4;
 
-    final budgetProgress = monthlyBudget <= 0
-        ? 0.0
-        : (totalSpent / monthlyBudget).clamp(0.0, 1.0).toDouble();
+    final utilization = monthlyBudget == null
+        ? null
+        : budgetUtilization(totalSpent, monthlyBudget);
+    final budgetProgress = (utilization ?? 0.0).clamp(0.0, 100.0) / 100.0;
 
     return SafeArea(
       child: SingleChildScrollView(
@@ -89,22 +112,70 @@ class MoneyPage extends StatelessWidget {
             // ============================================================
             // HEADER
             // ============================================================
-            Row(
-              children: [
-                const Text(
-                  'Money',
-                  style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-                ),
-                const Spacer(),
-                IconButton(
-                  onPressed: () => showAddExpenseDialog(context),
-                  icon: const Icon(Icons.add),
-                  tooltip: 'Add expense',
-                ),
-              ],
+            const Text(
+              'Money',
+              style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
             ),
 
             const SizedBox(height: 24),
+
+            // ============================================================
+            // MONTH SELECTOR
+            // ============================================================
+            Column(
+              children: [
+                Row(
+                  children: [
+                    IconButton(
+                      onPressed: () => onMonthChanged(
+                        DateTime(selectedMonth.year, selectedMonth.month - 1),
+                      ),
+                      icon: const Icon(Icons.chevron_left),
+                      tooltip: 'Previous month',
+                    ),
+                    Expanded(
+                      child: Center(
+                        child: TextButton.icon(
+                          onPressed: () => _pickMonth(context),
+                          icon: const Icon(Icons.expand_more),
+                          label: Text(
+                            _monthLabel(selectedMonth),
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => onMonthChanged(
+                        DateTime(selectedMonth.year, selectedMonth.month + 1),
+                      ),
+                      icon: const Icon(Icons.chevron_right),
+                      tooltip: 'Next month',
+                    ),
+                  ],
+                ),
+                if (isPastMonth)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 2),
+                    child: TextButton.icon(
+                      onPressed: () =>
+                          onMonthChanged(DateTime(today.year, today.month)),
+                      icon: const Icon(Icons.today, size: 16),
+                      label: Text('Jump to ${_monthLabel(today)}'),
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+
+            const SizedBox(height: 12),
 
             // ============================================================
             // MONTHLY SPENDING
@@ -135,21 +206,63 @@ class MoneyPage extends StatelessWidget {
                       borderRadius: BorderRadius.circular(10),
                     ),
                     const SizedBox(height: 10),
+                    if (utilization != null)
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          '${utilization.toStringAsFixed(1)}% used',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ),
                     Row(
                       children: [
                         Expanded(
-                          child: Text(
-                            'Budget: RM${monthlyBudget.toStringAsFixed(2)}',
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: TextButton.icon(
+                              onPressed: () =>
+                                  showBudgetDialog(context, key, monthlyBudget),
+                              icon: Icon(
+                                monthlyBudget == null
+                                    ? Icons.add
+                                    : Icons.edit_outlined,
+                                size: 16,
+                              ),
+                              label: Text(
+                                monthlyBudget == null
+                                    ? 'Set budget'
+                                    : 'RM${monthlyBudget.toStringAsFixed(2)}',
+                              ),
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                ),
+                                visualDensity: VisualDensity.compact,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                            ),
                           ),
                         ),
-                        Text(
-                          remaining >= 0
-                              ? 'RM${remaining.toStringAsFixed(2)} left'
-                              : 'RM${remaining.abs().toStringAsFixed(2)} over',
-                          style: TextStyle(
-                            color: remaining >= 0 ? Colors.green : Colors.red,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        Builder(
+                          builder: (_) {
+                            if (remaining == null) {
+                              return const Text('');
+                            }
+                            return Text(
+                              remaining >= 0
+                                  ? 'RM${remaining.toStringAsFixed(2)} left'
+                                  : 'RM${remaining.abs().toStringAsFixed(2)} over',
+                              style: TextStyle(
+                                color: remaining >= 0
+                                    ? Colors.green
+                                    : Colors.red,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            );
+                          },
                         ),
                       ],
                     ),
@@ -170,10 +283,31 @@ class MoneyPage extends StatelessWidget {
 
             const SizedBox(height: 12),
 
-            OutlinedButton.icon(
-              onPressed: () => showBudgetDialog(context),
-              icon: const Icon(Icons.edit_outlined),
-              label: const Text('Edit monthly budget'),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () =>
+                        showBudgetDialog(context, key, monthlyBudget),
+                    icon: const Icon(Icons.edit_outlined),
+                    label: Text(
+                      monthlyBudget == null ? 'Set budget' : 'Edit budget',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: () => showAddExpenseDialog(context),
+                    icon: const Icon(Icons.add),
+                    label: const Text(
+                      'Add expense',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+              ],
             ),
 
             const SizedBox(height: 12),
@@ -188,7 +322,9 @@ class MoneyPage extends StatelessWidget {
                 title: const Text('Weekly budget'),
                 subtitle: const Text('Based on your monthly budget'),
                 trailing: Text(
-                  'RM${weeklyBudget.toStringAsFixed(2)}',
+                  weeklyBudget == null
+                      ? '—'
+                      : 'RM${weeklyBudget.toStringAsFixed(2)}',
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
@@ -200,23 +336,38 @@ class MoneyPage extends StatelessWidget {
             const SizedBox(height: 24),
 
             // ============================================================
-            // RECENT EXPENSES
+            // DAILY BUDGET CALCULATOR
+            // ============================================================
+            _DailyBudgetCard(
+              selectedMonth: selectedMonth,
+              monthlyBudget: monthlyBudget,
+              totalSpent: totalSpent,
+              remaining: remaining,
+              monthKey: key,
+              onApplyBudget: (amount) =>
+                  showBudgetDialog(context, key, monthlyBudget, amount: amount),
+            ),
+
+            const SizedBox(height: 24),
+
+            // ============================================================
+            // EXPENSE HISTORY (selected month only)
             // ============================================================
             Row(
               children: [
                 const Text(
-                  'Recent expenses',
+                  'Expenses',
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 const Spacer(),
                 Text(
-                  '${expenses.length} items',
+                  '${monthExpenses.length} items',
                   style: TextStyle(color: Colors.grey.shade600),
                 ),
               ],
             ),
 
-            if (expenses.isNotEmpty) ...[
+            if (monthExpenses.isNotEmpty) ...[
               const SizedBox(height: 8),
               Row(
                 children: [
@@ -240,9 +391,10 @@ class MoneyPage extends StatelessWidget {
 
             const SizedBox(height: 12),
 
-            if (expenses.isEmpty) _emptyCard('No expenses yet.'),
+            if (monthExpenses.isEmpty)
+              _emptyCard('No expenses in ${_monthLabel(selectedMonth)}.'),
 
-            ...expenses.map(
+            ...monthExpenses.map(
               (expense) => Dismissible(
                 key: ValueKey('expense_${expense.id}'),
                 direction: DismissDirection.endToStart,
@@ -310,9 +462,7 @@ class MoneyPage extends StatelessWidget {
                   child: OutlinedButton.icon(
                     onPressed: () => _showAllSavings(context),
                     icon: const Icon(Icons.savings_outlined, size: 18),
-                    label: Text(
-                      'View all (${savingsGoals.length})',
-                    ),
+                    label: Text('View all (${savingsGoals.length})'),
                   ),
                 ),
             ],
@@ -320,6 +470,105 @@ class MoneyPage extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// Month picker so the month label is a real control, not a dead one.
+  Future<void> _pickMonth(BuildContext context) async {
+    var year = selectedMonth.year;
+    var month = selectedMonth.month;
+
+    final result = await showDialog<DateTime>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            return AlertDialog(
+              title: const Text('Select month'),
+              content: SizedBox(
+                width: 320,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        IconButton(
+                          onPressed: () => setDialogState(() => year--),
+                          icon: const Icon(Icons.chevron_left),
+                          tooltip: 'Previous year',
+                        ),
+                        Text(
+                          year.toString(),
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => setDialogState(() => year++),
+                          icon: const Icon(Icons.chevron_right),
+                          tooltip: 'Next year',
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (var m = 1; m <= 12; m++)
+                          ChoiceChip(
+                            label: Text(_monthNames[m - 1].substring(0, 3)),
+                            selected: m == month,
+                            onSelected: (_) => setDialogState(() => month = m),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () =>
+                      Navigator.of(dialogContext).pop(DateTime(year, month)),
+                  child: const Text('Go'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (!context.mounted || result == null) return;
+    onMonthChanged(result);
+  }
+
+  // ================================================================
+  // MONTH LABEL
+  // ================================================================
+
+  static const List<String> _monthNames = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ];
+
+  String _monthLabel(DateTime month) {
+    return '${_monthNames[month.month - 1]} ${month.year}';
   }
 
   // ================================================================
@@ -525,14 +774,48 @@ class MoneyPage extends StatelessWidget {
   // BUDGET
   // ================================================================
 
-  Future<void> showBudgetDialog(BuildContext context) async {
-    final result = await showDialog<double>(
+  Future<void> showBudgetDialog(
+    BuildContext context,
+    String monthKey,
+    double? existingBudget, {
+    double? amount,
+  }) async {
+    double? result = amount;
+    result ??= await showDialog<double>(
       context: context,
-      builder: (_) => _BudgetDialog(initialBudget: monthlyBudget),
+      builder: (_) => _BudgetDialog(initialBudget: existingBudget ?? 0),
     );
+    // Confirm before replacing an existing budget for this month.
+    if (!context.mounted) return;
+    if (result != null &&
+        existingBudget != null &&
+        (result - existingBudget).abs() > 0.005) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Replace budget?'),
+          content: Text(
+            'This month already has a budget of '
+            'RM${existingBudget.toStringAsFixed(2)}. '
+            'Replace it with RM${result!.toStringAsFixed(2)}?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Keep existing'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Replace'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+    }
 
     if (result != null) {
-      onUpdateBudget(result);
+      await onUpdateMonthlyBudget(monthKey, result);
     }
   }
 
@@ -895,6 +1178,247 @@ class _BudgetDialogState extends State<_BudgetDialog> {
 }
 
 // ============================================================================
+// DAILY BUDGET CALCULATOR
+// ============================================================================
+
+/// Daily target <-> monthly budget converter + remaining daily allowance.
+///
+/// Pure display widget: never writes storage itself. Applying the
+/// calculated budget goes through the page's budget flow (with the
+/// replace-confirmation when the month already has a budget).
+class _DailyBudgetCard extends StatefulWidget {
+  const _DailyBudgetCard({
+    required this.selectedMonth,
+    required this.monthlyBudget,
+    required this.totalSpent,
+    required this.remaining,
+    required this.monthKey,
+    required this.onApplyBudget,
+  });
+
+  final DateTime selectedMonth;
+  final double? monthlyBudget;
+  final double totalSpent;
+  final double? remaining;
+  final String monthKey;
+  final ValueChanged<double> onApplyBudget;
+
+  @override
+  State<_DailyBudgetCard> createState() => _DailyBudgetCardState();
+}
+
+class _DailyBudgetCardState extends State<_DailyBudgetCard> {
+  final TextEditingController _dailyController = TextEditingController();
+  double? _previewMonthly;
+
+  @override
+  void dispose() {
+    _dailyController.dispose();
+    super.dispose();
+  }
+
+  void _computeFromDaily() {
+    final daily = double.tryParse(_dailyController.text.trim());
+    if (daily == null || daily <= 0) {
+      setState(() => _previewMonthly = null);
+      return;
+    }
+    setState(
+      () => _previewMonthly = dailyToMonthly(
+        daily,
+        daysInMonth(widget.selectedMonth),
+      ),
+    );
+  }
+
+  String _label(DateTime month) {
+    return '${_DailyBudgetCardMonth.names[month.month - 1]} '
+        '${month.year}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final days = daysInMonth(widget.selectedMonth);
+    final dailyTarget = widget.monthlyBudget == null
+        ? null
+        : monthlyToDaily(widget.monthlyBudget!, days);
+
+    final now = DateTime.now();
+    final isCurrentMonth =
+        now.year == widget.selectedMonth.year &&
+        now.month == widget.selectedMonth.month;
+    final remainingDays = isCurrentMonth ? days - now.day + 1 : 0;
+    final allowance = widget.remaining == null || widget.remaining! < 0
+        ? null
+        : remainingDailyAllowance(widget.remaining!, remainingDays);
+
+    return Card(
+      elevation: 0,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.calculate_outlined, size: 20),
+                const SizedBox(width: 8),
+                const Text(
+                  'Daily budget calculator',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '$days days in ${_label(widget.selectedMonth)}',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _dailyController,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: const InputDecoration(
+                prefixText: 'RM ',
+                labelText: 'Daily target',
+                hintText: 'e.g. 30.00',
+                helperText: 'Enter an amount per day to see the monthly budget',
+              ),
+              onChanged: (_) => _computeFromDaily(),
+            ),
+            const SizedBox(height: 8),
+            if (_previewMonthly != null) ...[
+              Text(
+                'Monthly budget: RM${_previewMonthly!.toStringAsFixed(2)}',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () => widget.onApplyBudget(_previewMonthly!),
+                  child: Text(
+                    widget.monthlyBudget == null
+                        ? 'Set as ${_label(widget.selectedMonth)} budget'
+                        : 'Replace budget with this amount',
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Theme.of(
+                  context,
+                ).colorScheme.primary.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Based on your numbers',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.4,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  _calcRow(
+                    'Daily target',
+                    dailyTarget == null
+                        ? 'Set a budget first'
+                        : 'RM${dailyTarget.toStringAsFixed(2)} / day',
+                  ),
+                  const SizedBox(height: 6),
+                  if (widget.monthlyBudget != null)
+                    _calcRow(
+                      'Spent so far',
+                      'RM${widget.totalSpent.toStringAsFixed(2)}',
+                    ),
+                  const SizedBox(height: 6),
+                  _allowanceRow(allowance, widget.remaining, remainingDays),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _calcRow(String label, String value) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(label, style: TextStyle(color: Colors.grey.shade600)),
+        ),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+      ],
+    );
+  }
+
+  Widget _allowanceRow(double? allowance, double? remaining, int daysLeft) {
+    if (remaining == null) {
+      return _calcRow('Daily allowance', 'Set a budget first');
+    }
+    if (remaining < 0) {
+      return Row(
+        children: [
+          Expanded(
+            child: Text(
+              'Daily allowance',
+              style: TextStyle(color: Colors.grey.shade600),
+            ),
+          ),
+          Text(
+            'RM${remaining.abs().toStringAsFixed(2)} over',
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.red,
+            ),
+          ),
+        ],
+      );
+    }
+    if (allowance == null) {
+      return _calcRow(
+        'Daily allowance',
+        daysLeft <= 0 ? 'Month has ended' : '—',
+      );
+    }
+    return _calcRow(
+      'Daily allowance',
+      'RM${allowance.toStringAsFixed(2)} / day ($daysLeft left)',
+    );
+  }
+}
+
+/// Month names shared by the card above.
+class _DailyBudgetCardMonth {
+  static const List<String> names = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ];
+}
+
+// ============================================================================
 // SAVINGS GOAL RESULT
 // ============================================================================
 
@@ -1154,9 +1678,9 @@ class _SavingsAmountDialogState extends State<_SavingsAmountDialog> {
       );
     } else {
       // Remove-flow still expects a plain double.
-      Navigator.of(context).pop(
-        _TransferDialogResult(amount: amount, countAsSpending: false),
-      );
+      Navigator.of(
+        context,
+      ).pop(_TransferDialogResult(amount: amount, countAsSpending: false));
     }
   }
 

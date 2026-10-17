@@ -165,6 +165,57 @@ class AppStorage {
   }
 
   // ============================================================
+  // MONTHLY BUDGET (single serialized JSON map)
+  // Stored under 'monthly_budgets' as {"2026-10": 1200.0, ...}
+  // One entry per month; missing month = no budget configured.
+  // Legacy 'monthly_budget' key is left untouched.
+  // ============================================================
+
+  static Future<void> saveMonthlyBudget(String monthKey, double budget) async {
+    final prefs = await _prefs();
+    final current = (await loadMonthlyBudgetMap()) ?? {};
+    current[monthKey] = budget;
+    await prefs.setString('monthly_budgets', jsonEncode(current));
+  }
+
+  static Future<double?> loadMonthlyBudget(String monthKey) async {
+    final map = await loadMonthlyBudgetMap();
+    if (map == null) return null;
+    final value = map[monthKey];
+    if (value == null) return null;
+    if (!value.isFinite) return null;
+    return value;
+  }
+
+  static Future<Map<String, double>?> loadMonthlyBudgetMap() async {
+    final prefs = await _prefs();
+    final raw = prefs.getString('monthly_budgets');
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(raw);
+      // If the stored value is not a map at all, leave it alone for a
+      // human to recover (backup key) instead of silently dropping it.
+      if (decoded is! Map<String, dynamic>) {
+        await prefs.setString('monthly_budgets_backup', raw);
+        return null;
+      }
+      final map = <String, double>{};
+      for (final entry in decoded.entries) {
+        // JSON may encode whole numbers without a decimal point,
+        // so accept any numeric value and normalize to double.
+        final value = entry.value;
+        if (value is num) {
+          final v = value.toDouble();
+          if (v.isFinite) map[entry.key] = v;
+        }
+      }
+      return map.isEmpty ? null : map;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // ============================================================
   // SCHEDULE
   // ============================================================
 
