@@ -287,7 +287,7 @@ LifeZen/
 │ ├── utils/
 │ │ └── app_helpers.dart
 │ │ └── schedule_colors.dart
-│ │
+│ │ └── budget_calculator.dart
 │ │
 │ ├── notification_service.dart
 │ │
