@@ -44,8 +44,24 @@ double monthlyToDaily(double monthly, int days) {
 
 /// Remaining allowance per day among the remaining days of the month.
 /// Returns null when there are no remaining days.
-/// (month is over).
 double? remainingDailyAllowance(double remaining, int remainingDays) {
   if (remainingDays <= 0) return null;
   return remaining / remainingDays;
+}
+
+/// Unspent budget from the previous month that rolls forward.
+/// Returns 0 when there is no previous budget or nothing left over.
+double carryoverFromPrevious(
+  List<Expense> expenses,
+  Map<String, double> monthlyBudgets,
+  DateTime currentMonth,
+) {
+  final previousMonth = DateTime(currentMonth.year, currentMonth.month - 1);
+  final previousKey = formatMonthKey(previousMonth);
+  final previousBudget = monthlyBudgets[previousKey];
+  if (previousBudget == null) return 0.0;
+
+  final previousSpent = monthlySpent(expenses, previousKey);
+  final leftover = remainingBudget(previousBudget, previousSpent);
+  return leftover > 0 ? leftover : 0.0;
 }

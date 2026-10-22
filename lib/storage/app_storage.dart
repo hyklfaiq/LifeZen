@@ -178,6 +178,17 @@ class AppStorage {
     await prefs.setString('monthly_budgets', jsonEncode(current));
   }
 
+  static Future<void> deleteMonthlyBudget(String monthKey) async {
+    final prefs = await _prefs();
+    final current = (await loadMonthlyBudgetMap()) ?? {};
+    current.remove(monthKey);
+    if (current.isEmpty) {
+      await prefs.remove('monthly_budgets');
+      return;
+    }
+    await prefs.setString('monthly_budgets', jsonEncode(current));
+  }
+
   static Future<double?> loadMonthlyBudget(String monthKey) async {
     final map = await loadMonthlyBudgetMap();
     if (map == null) return null;

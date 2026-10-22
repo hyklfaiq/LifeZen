@@ -1474,7 +1474,11 @@ class _SchedulePageState extends State<SchedulePage> {
         // Manual classes have no course code, so the card shows the full
         // title. Keep a readable font size and wrap with ellipsis instead
         // of letting FittedBox scale the text down to a few pixels.
-        final maxLines = height >= 70 ? 3 : height >= 45 ? 2 : 1;
+        final maxLines = height >= 70
+            ? 3
+            : height >= 45
+            ? 2
+            : 1;
         return Center(
           child: Text(
             compactTitle,
@@ -1692,13 +1696,20 @@ class _SchedulePageState extends State<SchedulePage> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 20, vertical: isLandscape ? 2 : 6),
+      padding: EdgeInsets.symmetric(
+        horizontal: 20,
+        vertical: isLandscape ? 2 : 6,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.schedule_outlined, size: 16, color: colorScheme.primary),
+              Icon(
+                Icons.schedule_outlined,
+                size: 16,
+                color: colorScheme.primary,
+              ),
               const SizedBox(width: 6),
               Text(
                 'No fixed time',
@@ -1742,9 +1753,8 @@ class _SchedulePageState extends State<SchedulePage> {
     final subject = (courseName != null && courseName.isNotEmpty)
         ? courseName
         : item.title.trim();
-    final label = (courseCode != null &&
-            courseCode.isNotEmpty &&
-            courseCode != subject)
+    final label =
+        (courseCode != null && courseCode.isNotEmpty && courseCode != subject)
         ? '$courseCode • $subject'
         : subject;
 
@@ -2333,9 +2343,13 @@ class _ScheduleEditorDialogState extends State<_ScheduleEditorDialog> {
 
     return AlertDialog(
       title: Text(isEditing ? 'Edit Schedule' : 'Add Schedule'),
+
+      titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+      contentPadding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
       content: SizedBox(
         width: 420,
         child: SingleChildScrollView(
+          padding: const EdgeInsets.only(top: 8),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -2349,6 +2363,7 @@ class _ScheduleEditorDialogState extends State<_ScheduleEditorDialog> {
                 decoration: const InputDecoration(
                   labelText: 'Schedule name',
                   hintText: 'e.g. Study or CSCI 584',
+                  floatingLabelBehavior: FloatingLabelBehavior.always,
                   border: OutlineInputBorder(),
                 ),
               ),
@@ -2511,9 +2526,7 @@ class _ScheduleEditorDialogState extends State<_ScheduleEditorDialog> {
                 ReminderPicker(
                   value: reminderMinutes,
                   allowUseDefault: false,
-                  onChanged: (v) => setState(
-                    () => reminderMinutes = v ?? 10,
-                  ),
+                  onChanged: (v) => setState(() => reminderMinutes = v ?? 10),
                 ),
 
                 const SizedBox(height: 12),

@@ -171,8 +171,39 @@ class _LifeZenAppState extends State<LifeZenApp> {
   }
 }
 
-class StartupScreen extends StatelessWidget {
+class StartupScreen extends StatefulWidget {
   const StartupScreen({super.key});
+
+  @override
+  State<StartupScreen> createState() => _StartupScreenState();
+}
+
+class _StartupScreenState extends State<StartupScreen> with SingleTickerProviderStateMixin {
+  late final AnimationController _animationController;
+  late final Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 700),
+      vsync: this,
+    );
+    _scaleAnimation = _animationController.drive(
+      Tween(begin: 0.82, end: 1),
+    );
+    // Run the scale animation once, then stop at 1.0.
+    // The controller is NOT recreated on rebuilds, so the animation
+    // plays exactly once and stays at 1.0.
+    _animationController.forward().then((_) => _animationController.stop());
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -195,13 +226,8 @@ class StartupScreen extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              TweenAnimationBuilder<double>(
-                tween: Tween(begin: 0.82, end: 1),
-                duration: const Duration(milliseconds: 700),
-                curve: Curves.easeOutBack,
-                builder: (context, scale, child) {
-                  return Transform.scale(scale: scale, child: child);
-                },
+              Transform.scale(
+                scale: _scaleAnimation.value,
                 child: Container(
                   width: 120,
                   height: 120,
@@ -789,9 +815,14 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
-  Future<void> updateMonthlyBudget(String monthKey, double amount) async {
-    monthlyBudgets[monthKey] = amount;
-    await AppStorage.saveMonthlyBudget(monthKey, amount);
+  Future<void> updateMonthlyBudget(String monthKey, double? amount) async {
+    if (amount == null || amount <= 0) {
+      monthlyBudgets.remove(monthKey);
+      await AppStorage.deleteMonthlyBudget(monthKey);
+    } else {
+      monthlyBudgets[monthKey] = amount;
+      await AppStorage.saveMonthlyBudget(monthKey, amount);
+    }
     if (!mounted) return;
     setState(() {});
   }

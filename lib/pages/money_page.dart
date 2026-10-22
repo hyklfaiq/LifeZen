@@ -24,7 +24,7 @@ class MoneyPage extends StatelessWidget {
 
   /// Month navigation + per-month budget writes (owned by MainScreen).
   final ValueChanged<DateTime> onMonthChanged;
-  final Future<void> Function(String monthKey, double amount)
+  final Future<void> Function(String monthKey, double? amount)
   onUpdateMonthlyBudget;
 
   // Create a new savings goal
@@ -93,10 +93,12 @@ class MoneyPage extends StatelessWidget {
         .where((expense) => expense.category == 'Transfer')
         .fold<double>(0, (sum, expense) => sum + expense.amount);
 
-    final remaining = monthlyBudget == null
+    final remaining = monthlyBudget == null || monthlyBudget == 0
         ? null
         : remainingBudget(monthlyBudget, totalSpent);
-    final weeklyBudget = monthlyBudget == null ? null : monthlyBudget / 4;
+    final weeklyBudget = monthlyBudget == null || monthlyBudget == 0
+        ? null
+        : monthlyBudget / 4;
 
     final utilization = monthlyBudget == null
         ? null
@@ -226,13 +228,13 @@ class MoneyPage extends StatelessWidget {
                               onPressed: () =>
                                   showBudgetDialog(context, key, monthlyBudget),
                               icon: Icon(
-                                monthlyBudget == null
+                                monthlyBudget == null || monthlyBudget == 0
                                     ? Icons.add
                                     : Icons.edit_outlined,
                                 size: 16,
                               ),
                               label: Text(
-                                monthlyBudget == null
+                                monthlyBudget == null || monthlyBudget == 0
                                     ? 'Set budget'
                                     : 'RM${monthlyBudget.toStringAsFixed(2)}',
                               ),
@@ -248,7 +250,7 @@ class MoneyPage extends StatelessWidget {
                         ),
                         Builder(
                           builder: (_) {
-                            if (remaining == null) {
+                            if (remaining == null || remaining == 0) {
                               return const Text('');
                             }
                             return Text(
@@ -787,6 +789,11 @@ class MoneyPage extends StatelessWidget {
     );
     // Confirm before replacing an existing budget for this month.
     if (!context.mounted) return;
+    if (result == null && existingBudget != null) {
+      // User cleared the field: delete the existing budget.
+      await onUpdateMonthlyBudget(monthKey, null);
+      return;
+    }
     if (result != null &&
         existingBudget != null &&
         (result - existingBudget).abs() > 0.005) {
@@ -1116,7 +1123,7 @@ class _AddExpenseDialogState extends State<_AddExpenseDialog> {
 class _BudgetDialog extends StatefulWidget {
   const _BudgetDialog({required this.initialBudget});
 
-  final double initialBudget;
+  final double? initialBudget;
 
   @override
   State<_BudgetDialog> createState() => _BudgetDialogState();
@@ -1130,7 +1137,7 @@ class _BudgetDialogState extends State<_BudgetDialog> {
     super.initState();
 
     _controller = TextEditingController(
-      text: widget.initialBudget.toStringAsFixed(2),
+      text: widget.initialBudget?.toStringAsFixed(2) ?? '',
     );
   }
 
@@ -1142,7 +1149,15 @@ class _BudgetDialogState extends State<_BudgetDialog> {
   }
 
   void _submit() {
-    final amount = double.tryParse(_controller.text.trim());
+    final text = _controller.text.trim();
+
+    if (text.isEmpty) {
+      // Clearing the field means "no budget set"
+      Navigator.of(context).pop(null);
+      return;
+    }
+
+    final amount = double.tryParse(text);
 
     if (amount == null || amount < 0) {
       return;
