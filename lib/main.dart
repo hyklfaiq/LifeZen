@@ -808,6 +808,17 @@ class _MainScreenState extends State<MainScreen> {
     setState(() {});
   }
 
+  Future<void> updateExpense(Expense updatedExpense) async {
+    final index = expenses.indexWhere((e) => e.id == updatedExpense.id);
+    if (index == -1) return;
+    expenses[index] = updatedExpense;
+    await AppStorage.saveExpenses(
+      expenses.map((expense) => expense.toMap()).toList(),
+    );
+    if (!mounted) return;
+    setState(() {});
+  }
+
   void setSelectedMonth(DateTime month) {
     selectedMonth = DateTime(month.year, month.month);
     if (mounted) {
@@ -977,6 +988,7 @@ class _MainScreenState extends State<MainScreen> {
         savingsGoals: savingsGoals,
         onAddExpense: addExpense,
         onDeleteExpense: deleteExpense,
+        onEditExpense: updateExpense,
         onMonthChanged: setSelectedMonth,
         onUpdateMonthlyBudget: updateMonthlyBudget,
         onCreateSavings: saveSavingsGoal,

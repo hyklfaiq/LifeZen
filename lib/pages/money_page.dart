@@ -21,6 +21,7 @@ class MoneyPage extends StatelessWidget {
 
   final Function(Expense) onAddExpense;
   final Function(int) onDeleteExpense;
+  final Function(Expense) onEditExpense;
 
   /// Month navigation + per-month budget writes (owned by MainScreen).
   final ValueChanged<DateTime> onMonthChanged;
@@ -62,6 +63,7 @@ class MoneyPage extends StatelessWidget {
     required this.savingsGoals,
     required this.onAddExpense,
     required this.onDeleteExpense,
+    required this.onEditExpense,
     required this.onMonthChanged,
     required this.onUpdateMonthlyBudget,
     required this.onCreateSavings,
@@ -413,9 +415,20 @@ class MoneyPage extends StatelessWidget {
                     subtitle: Text(
                       '${expense.category} • ${formatDate(expense.date)}',
                     ),
-                    trailing: Text(
-                      'RM${expense.amount.toStringAsFixed(2)}',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'RM${expense.amount.toStringAsFixed(2)}',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(width: 12),
+                        IconButton(
+                          icon: const Icon(Icons.edit_outlined, size: 20),
+                          tooltip: 'Edit expense',
+                          onPressed: () => showEditExpenseDialog(context, expense),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -772,6 +785,16 @@ class MoneyPage extends StatelessWidget {
     }
   }
 
+  Future<void> showEditExpenseDialog(BuildContext context, Expense expense) async {
+    final result = await showDialog<Expense>(
+      context: context,
+      builder: (_) => _EditExpenseDialog(initialExpense: expense),
+    );
+    if (result != null && context.mounted) {
+      onEditExpense(result);
+    }
+  }
+
   // ================================================================
   // BUDGET
   // ================================================================
@@ -789,13 +812,11 @@ class MoneyPage extends StatelessWidget {
     );
     // Confirm before replacing an existing budget for this month.
     if (!context.mounted) return;
-    if (result == null && existingBudget != null) {
-      // User cleared the field: delete the existing budget.
-      await onUpdateMonthlyBudget(monthKey, null);
+    if (result == null) {
+      // User cancelled - do nothing, keep existing budget unchanged.
       return;
     }
-    if (result != null &&
-        existingBudget != null &&
+    if (existingBudget != null &&
         (result - existingBudget).abs() > 0.005) {
       final confirmed = await showDialog<bool>(
         context: context,
@@ -821,9 +842,7 @@ class MoneyPage extends StatelessWidget {
       if (confirmed != true) return;
     }
 
-    if (result != null) {
-      await onUpdateMonthlyBudget(monthKey, result);
-    }
+    await onUpdateMonthlyBudget(monthKey, result);
   }
 
   // ================================================================
@@ -1004,8 +1023,8 @@ class _AddExpenseDialog extends StatefulWidget {
 class _AddExpenseDialogState extends State<_AddExpenseDialog> {
   late final TextEditingController _titleController;
   late final TextEditingController _amountController;
-
-  String _category = 'Food';
+  late String _category;
+  DateTime _date = DateTime.now();
 
   @override
   void initState() {
@@ -1013,6 +1032,7 @@ class _AddExpenseDialogState extends State<_AddExpenseDialog> {
 
     _titleController = TextEditingController();
     _amountController = TextEditingController();
+    _category = 'Food';
   }
 
   @override
@@ -1021,6 +1041,18 @@ class _AddExpenseDialogState extends State<_AddExpenseDialog> {
     _amountController.dispose();
 
     super.dispose();
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _date,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2035),
+    );
+    if (picked != null && mounted) {
+      setState(() => _date = picked);
+    }
   }
 
   void _submit() {
@@ -1038,7 +1070,7 @@ class _AddExpenseDialogState extends State<_AddExpenseDialog> {
         title: title,
         amount: amount,
         category: _category,
-        date: DateTime.now(),
+        date: _date,
       ),
     );
   }
@@ -1051,6 +1083,165 @@ class _AddExpenseDialogState extends State<_AddExpenseDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+             ListTile(
+              title: const Text('Date'),
+              subtitle: Text('${_date.day}/${_date.month}/${_date.year}'),
+              trailing: const Icon(Icons.calendar_today),
+              onTap: _pickDate,
+            ),
+
+            const SizedBox(height: 12),
+            TextField(
+              controller: _titleController,
+              autofocus: true,
+              textInputAction: TextInputAction.next,
+              decoration: const InputDecoration(
+                labelText: 'Expense',
+                hintText: 'e.g. Lunch',
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            TextField(
+              controller: _amountController,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              textInputAction: TextInputAction.done,
+              decoration: const InputDecoration(
+                labelText: 'Amount',
+                prefixText: 'RM ',
+              ),
+              onSubmitted: (_) => _submit(),
+            ),
+
+            const SizedBox(height: 12),
+
+            DropdownButtonFormField<String>(
+              initialValue: _category,
+              decoration: const InputDecoration(labelText: 'Category'),
+              items: const [
+                DropdownMenuItem(value: 'Food', child: Text('Food')),
+                DropdownMenuItem(value: 'Transport', child: Text('Transport')),
+                DropdownMenuItem(value: 'Education', child: Text('Education')),
+                DropdownMenuItem(
+                  value: 'Entertainment',
+                  child: Text('Entertainment'),
+                ),
+                DropdownMenuItem(value: 'Shopping', child: Text('Shopping')),
+                DropdownMenuItem(value: 'Bills', child: Text('Bills')),
+                DropdownMenuItem(value: 'Transfer', child: Text('Transfer')),
+                DropdownMenuItem(value: 'Other', child: Text('Other')),
+              ],
+              onChanged: (value) {
+                if (value == null) return;
+
+                setState(() {
+                  _category = value;
+                });
+              },
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(onPressed: _submit, child: const Text('Save')),
+      ],
+    );
+  }
+}
+
+// ============================================================================
+// EDIT EXPENSE DIALOG CLASS
+// ============================================================================
+
+class _EditExpenseDialog extends StatefulWidget {
+  const _EditExpenseDialog({required this.initialExpense});
+
+  final Expense initialExpense;
+
+  @override
+  State<_EditExpenseDialog> createState() => _EditExpenseDialogState();
+}
+
+class _EditExpenseDialogState extends State<_EditExpenseDialog> {
+  late final TextEditingController _titleController;
+  late final TextEditingController _amountController;
+  late String _category;
+  DateTime _date = DateTime.now();
+
+  @override
+  void initState() {
+    super.initState();
+    _titleController = TextEditingController(text: widget.initialExpense.title);
+    _amountController =
+        TextEditingController(text: widget.initialExpense.amount.toStringAsFixed(2));
+    _category = widget.initialExpense.category;
+    _date = widget.initialExpense.date;
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _amountController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _date,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2035),
+    );
+    if (picked != null && mounted) {
+      setState(() => _date = picked);
+    }
+  }
+
+  void _submit() {
+    final title = _titleController.text.trim();
+    final amount = double.tryParse(_amountController.text.trim());
+
+    if (title.isEmpty || amount == null || amount <= 0) {
+      return;
+    }
+
+    Navigator.of(context).pop(
+      Expense(
+        id: widget.initialExpense.id,
+        title: title,
+        amount: amount,
+        category: _category,
+        date: _date,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Edit Expense'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: const Text('Date'),
+              subtitle: Text(
+                '${_date.day}/${_date.month}/${_date.year}',
+              ),
+              trailing: const Icon(Icons.calendar_today),
+              onTap: _pickDate,
+            ),
+
+            const SizedBox(height: 12),
+
             TextField(
               controller: _titleController,
               autofocus: true,
