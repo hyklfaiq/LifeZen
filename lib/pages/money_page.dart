@@ -397,12 +397,44 @@ class MoneyPage extends StatelessWidget {
 
             if (monthExpenses.isEmpty)
               _emptyCard('No expenses in ${_monthLabel(selectedMonth)}.'),
-
-            ...monthExpenses.map(
+...monthExpenses.map(
               (expense) => Dismissible(
                 key: ValueKey('expense_${expense.id}'),
                 direction: DismissDirection.endToStart,
                 background: _deleteBackground(),
+
+                confirmDismiss: (_) async {
+                  final confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (dialogContext) => AlertDialog(
+                      title: const Text('Delete expense?'),
+                      content: Text(
+                        'Are you sure you want to delete "${expense.title}"? '
+                        'This action cannot be undone.',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () {
+                            Navigator.of(dialogContext).pop(false);
+                          },
+                          child: const Text('Cancel'),
+                        ),
+                        FilledButton(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.red,
+                          ),
+                          onPressed: () {
+                            Navigator.of(dialogContext).pop(true);
+                          },
+                          child: const Text('Delete'),
+                        ),
+                      ],
+                    ),
+                  );
+
+                  return confirmed ?? false;
+                },
+
                 onDismissed: (_) => onDeleteExpense(expense.id),
                 child: Card(
                   elevation: 0,
