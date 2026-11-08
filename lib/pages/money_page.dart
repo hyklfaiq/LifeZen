@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -91,10 +92,6 @@ class MoneyPage extends StatelessWidget {
 
     final totalSpent = monthlySpent(expenses, key);
 
-    final transferredThisMonth = monthExpenses
-        .where((expense) => expense.category == 'Transfer')
-        .fold<double>(0, (sum, expense) => sum + expense.amount);
-
     final remaining = monthlyBudget == null || monthlyBudget == 0
         ? null
         : remainingBudget(monthlyBudget, totalSpent);
@@ -102,11 +99,9 @@ class MoneyPage extends StatelessWidget {
         ? null
         : monthlyBudget / 4;
 
-    final utilization = monthlyBudget == null
+    final utilization = monthlyBudget == null || monthlyBudget == 0
         ? null
         : budgetUtilization(totalSpent, monthlyBudget);
-    final budgetProgress = (utilization ?? 0.0).clamp(0.0, 100.0) / 100.0;
-
     return SafeArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
@@ -182,107 +177,15 @@ class MoneyPage extends StatelessWidget {
             const SizedBox(height: 12),
 
             // ============================================================
-            // MONTHLY SPENDING
+            // MONTHLY SPENDING BY CATEGORY + BUDGET SUMMARY
             // ============================================================
-            Card(
-              elevation: 0,
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Monthly spending',
-                      style: TextStyle(color: Colors.grey.shade600),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'RM${totalSpent.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontSize: 34,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    LinearProgressIndicator(
-                      value: budgetProgress,
-                      minHeight: 8,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    const SizedBox(height: 10),
-                    if (utilization != null)
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: Text(
-                          '${utilization.toStringAsFixed(1)}% used',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                      ),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: TextButton.icon(
-                              onPressed: () =>
-                                  showBudgetDialog(context, key, monthlyBudget),
-                              icon: Icon(
-                                monthlyBudget == null || monthlyBudget == 0
-                                    ? Icons.add
-                                    : Icons.edit_outlined,
-                                size: 16,
-                              ),
-                              label: Text(
-                                monthlyBudget == null || monthlyBudget == 0
-                                    ? 'Set budget'
-                                    : 'RM${monthlyBudget.toStringAsFixed(2)}',
-                              ),
-                              style: TextButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                ),
-                                visualDensity: VisualDensity.compact,
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              ),
-                            ),
-                          ),
-                        ),
-                        Builder(
-                          builder: (_) {
-                            if (remaining == null || remaining == 0) {
-                              return const Text('');
-                            }
-                            return Text(
-                              remaining >= 0
-                                  ? 'RM${remaining.toStringAsFixed(2)} left'
-                                  : 'RM${remaining.abs().toStringAsFixed(2)} over',
-                              style: TextStyle(
-                                color: remaining >= 0
-                                    ? Colors.green
-                                    : Colors.red,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                    if (transferredThisMonth > 0) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        'Includes RM${transferredThisMonth.toStringAsFixed(2)} transferred to savings',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
+            const SizedBox(height: 16),
+
+            _MonthlyExpenseChart(
+              expenses: monthExpenses,
+              monthlyBudget: monthlyBudget,
+              remaining: remaining,
+              utilization: utilization,
             ),
 
             const SizedBox(height: 12),
@@ -397,7 +300,7 @@ class MoneyPage extends StatelessWidget {
 
             if (monthExpenses.isEmpty)
               _emptyCard('No expenses in ${_monthLabel(selectedMonth)}.'),
-...monthExpenses.map(
+            ...monthExpenses.map(
               (expense) => Dismissible(
                 key: ValueKey('expense_${expense.id}'),
                 direction: DismissDirection.endToStart,
@@ -458,7 +361,8 @@ class MoneyPage extends StatelessWidget {
                         IconButton(
                           icon: const Icon(Icons.edit_outlined, size: 20),
                           tooltip: 'Edit expense',
-                          onPressed: () => showEditExpenseDialog(context, expense),
+                          onPressed: () =>
+                              showEditExpenseDialog(context, expense),
                         ),
                       ],
                     ),
@@ -817,7 +721,10 @@ class MoneyPage extends StatelessWidget {
     }
   }
 
-  Future<void> showEditExpenseDialog(BuildContext context, Expense expense) async {
+  Future<void> showEditExpenseDialog(
+    BuildContext context,
+    Expense expense,
+  ) async {
     final result = await showDialog<Expense>(
       context: context,
       builder: (_) => _EditExpenseDialog(initialExpense: expense),
@@ -848,8 +755,7 @@ class MoneyPage extends StatelessWidget {
       // User cancelled - do nothing, keep existing budget unchanged.
       return;
     }
-    if (existingBudget != null &&
-        (result - existingBudget).abs() > 0.005) {
+    if (existingBudget != null && (result - existingBudget).abs() > 0.005) {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (_) => AlertDialog(
@@ -1115,7 +1021,7 @@ class _AddExpenseDialogState extends State<_AddExpenseDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-             ListTile(
+            ListTile(
               title: const Text('Date'),
               subtitle: Text('${_date.day}/${_date.month}/${_date.year}'),
               trailing: const Icon(Icons.calendar_today),
@@ -1211,8 +1117,9 @@ class _EditExpenseDialogState extends State<_EditExpenseDialog> {
   void initState() {
     super.initState();
     _titleController = TextEditingController(text: widget.initialExpense.title);
-    _amountController =
-        TextEditingController(text: widget.initialExpense.amount.toStringAsFixed(2));
+    _amountController = TextEditingController(
+      text: widget.initialExpense.amount.toStringAsFixed(2),
+    );
     _category = widget.initialExpense.category;
     _date = widget.initialExpense.date;
   }
@@ -1265,9 +1172,7 @@ class _EditExpenseDialogState extends State<_EditExpenseDialog> {
           children: [
             ListTile(
               title: const Text('Date'),
-              subtitle: Text(
-                '${_date.day}/${_date.month}/${_date.year}',
-              ),
+              subtitle: Text('${_date.day}/${_date.month}/${_date.year}'),
               trailing: const Icon(Icons.calendar_today),
               onTap: _pickDate,
             ),
@@ -1416,6 +1321,329 @@ class _BudgetDialogState extends State<_BudgetDialog> {
 }
 
 // ============================================================================
+// MONTHLY EXPENSE BREAKDOWN
+// ============================================================================
+
+class _MonthlyExpenseChart extends StatelessWidget {
+  const _MonthlyExpenseChart({
+    required this.expenses,
+    required this.monthlyBudget,
+    required this.remaining,
+    required this.utilization,
+  });
+
+  final List<Expense> expenses;
+  final double? monthlyBudget;
+  final double? remaining;
+  final double? utilization;
+
+  static const List<Color> _colors = [
+    Color(0xFF5B8DEF),
+    Color(0xFFF4A261),
+    Color(0xFF2A9D8F),
+    Color(0xFFE76F51),
+    Color(0xFF9B5DE5),
+    Color(0xFFF15BB5),
+    Color(0xFF00B4D8),
+    Color(0xFF8D99AE),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final totals = <String, double>{};
+    for (final expense in expenses) {
+      totals.update(
+        expense.category,
+        (value) => value + expense.amount,
+        ifAbsent: () => expense.amount,
+      );
+    }
+
+    final entries = totals.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final total = entries.fold<double>(0, (sum, item) => sum + item.value);
+    final hasExpenses = total > 0;
+    final isOverBudget = remaining != null && remaining! < 0;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Card(
+      elevation: 0,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Monthly spending by category',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Spending breakdown for the selected month',
+              style: TextStyle(
+                fontSize: 12,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 18),
+            if (!hasExpenses)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 28),
+                child: Center(child: Text('No expenses to show yet.')),
+              )
+            else ...[
+              Center(
+                child: SizedBox(
+                  width: 190,
+                  height: 190,
+                  child: CustomPaint(
+                    painter: _ExpenseDonutPainter(
+                      values: entries.map((entry) => entry.value).toList(),
+                      colors: List.generate(
+                        entries.length,
+                        (index) => _colors[index % _colors.length],
+                      ),
+                      overBudget: isOverBudget,
+                    ),
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(34),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                isOverBudget ? 'OVER BUDGET' : 'TOTAL SPENT',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: isOverBudget
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                  color: isOverBudget
+                                      ? colorScheme.error
+                                      : colorScheme.onSurfaceVariant,
+                                  letterSpacing: 0.7,
+                                ),
+                              ),
+                              const SizedBox(height: 5),
+                              Text(
+                                'RM${total.toStringAsFixed(2)}',
+                                style: TextStyle(
+                                  fontSize: 19,
+                                  fontWeight: FontWeight.bold,
+                                  color: isOverBudget
+                                      ? colorScheme.error
+                                      : null,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              if (isOverBudget) ...[
+                const SizedBox(height: 10),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: colorScheme.errorContainer,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        size: 18,
+                        color: colorScheme.onErrorContainer,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'You are RM${remaining!.abs().toStringAsFixed(2)} over your monthly budget.',
+                          style: TextStyle(
+                            color: colorScheme.onErrorContainer,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              const SizedBox(height: 18),
+              const Divider(height: 1),
+              const SizedBox(height: 10),
+              for (var i = 0; i < entries.length; i++)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 7),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 11,
+                        height: 11,
+                        decoration: BoxDecoration(
+                          color: _colors[i % _colors.length],
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 9),
+                      Expanded(
+                        child: Text(
+                          entries[i].key,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Text(
+                        '${(entries[i].value / total * 100).toStringAsFixed(1)}%',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        'RM${entries[i].value.toStringAsFixed(2)}',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+            const SizedBox(height: 10),
+            const Divider(height: 1),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Monthly budget',
+                    style: TextStyle(color: colorScheme.onSurfaceVariant),
+                  ),
+                ),
+                Text(
+                  monthlyBudget == null || monthlyBudget == 0
+                      ? 'Not set'
+                      : 'RM${monthlyBudget!.toStringAsFixed(2)}',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+            if (monthlyBudget != null && monthlyBudget! > 0) ...[
+              const SizedBox(height: 9),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: LinearProgressIndicator(
+                  value: ((utilization ?? 0) / 100).clamp(0.0, 1.0),
+                  minHeight: 7,
+                  color: isOverBudget ? colorScheme.error : null,
+                ),
+              ),
+              const SizedBox(height: 9),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${(utilization ?? 0).toStringAsFixed(1)}% of budget used',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    remaining == null
+                        ? '—'
+                        : remaining! >= 0
+                        ? 'RM${remaining!.toStringAsFixed(2)} left'
+                        : 'RM${remaining!.abs().toStringAsFixed(2)} over',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: remaining != null && remaining! < 0
+                          ? Colors.red
+                          : Colors.green,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ExpenseDonutPainter extends CustomPainter {
+  const _ExpenseDonutPainter({
+    required this.values,
+    required this.colors,
+    required this.overBudget,
+  });
+
+  final List<double> values;
+  final List<Color> colors;
+  final bool overBudget;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final total = values.fold<double>(0, (sum, value) => sum + value);
+    if (total <= 0) return;
+
+    final strokeWidth = size.width * 0.19;
+    final rect = Offset.zero & size;
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.butt;
+
+    var startAngle = -pi / 2;
+    for (var i = 0; i < values.length; i++) {
+      final sweepAngle = values[i] / total * 2 * pi;
+      paint.color = colors[i];
+      canvas.drawArc(
+        rect.deflate(strokeWidth / 2),
+        startAngle,
+        sweepAngle,
+        false,
+        paint,
+      );
+      startAngle += sweepAngle;
+    }
+
+    // Add a clear warning outline when spending exceeds the monthly budget.
+    if (overBudget) {
+      final warningPaint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3
+        ..color = const Color(0xFFD32F2F);
+      canvas.drawCircle(
+        size.center(Offset.zero),
+        size.width / 2 - 1.5,
+        warningPaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ExpenseDonutPainter oldDelegate) {
+    return oldDelegate.values != values ||
+        oldDelegate.colors != colors ||
+        oldDelegate.overBudget != overBudget;
+  }
+}
+
+// ============================================================================
 // DAILY BUDGET CALCULATOR
 // ============================================================================
 
@@ -1492,101 +1720,101 @@ class _DailyBudgetCardState extends State<_DailyBudgetCard> {
 
     return Card(
       elevation: 0,
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+      child: ExpansionTile(
+        initiallyExpanded: false,
+        leading: const Icon(Icons.calculate_outlined),
+        title: const Text(
+          'Daily budget calculator',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        subtitle: Text(
+          '$days days in ${_label(widget.selectedMonth)}',
+          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+        ),
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.calculate_outlined, size: 20),
-                const SizedBox(width: 8),
-                const Text(
-                  'Daily budget calculator',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _dailyController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(
+                    prefixText: 'RM ',
+                    labelText: 'Daily target',
+                    hintText: 'e.g. 30.00',
+                    helperText:
+                        'Enter an amount per day to see the monthly budget',
+                  ),
+                  onChanged: (_) => _computeFromDaily(),
+                ),
+                const SizedBox(height: 8),
+                if (_previewMonthly != null) ...[
+                  Text(
+                    'Monthly budget: RM${_previewMonthly!.toStringAsFixed(2)}',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () => widget.onApplyBudget(_previewMonthly!),
+                      child: Text(
+                        widget.monthlyBudget == null
+                            ? 'Set as ${_label(widget.selectedMonth)} budget'
+                            : 'Replace budget with this amount',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Based on your numbers',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.4,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      _calcRow(
+                        'Daily target',
+                        dailyTarget == null
+                            ? 'Set a budget first'
+                            : 'RM${dailyTarget.toStringAsFixed(2)} / day',
+                      ),
+                      const SizedBox(height: 6),
+                      if (widget.monthlyBudget != null)
+                        _calcRow(
+                          'Spent so far',
+                          'RM${widget.totalSpent.toStringAsFixed(2)}',
+                        ),
+                      const SizedBox(height: 6),
+                      _allowanceRow(allowance, widget.remaining, remainingDays),
+                    ],
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 6),
-            Text(
-              '$days days in ${_label(widget.selectedMonth)}',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _dailyController,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              decoration: const InputDecoration(
-                prefixText: 'RM ',
-                labelText: 'Daily target',
-                hintText: 'e.g. 30.00',
-                helperText: 'Enter an amount per day to see the monthly budget',
-              ),
-              onChanged: (_) => _computeFromDaily(),
-            ),
-            const SizedBox(height: 8),
-            if (_previewMonthly != null) ...[
-              Text(
-                'Monthly budget: RM${_previewMonthly!.toStringAsFixed(2)}',
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () => widget.onApplyBudget(_previewMonthly!),
-                  child: Text(
-                    widget.monthlyBudget == null
-                        ? 'Set as ${_label(widget.selectedMonth)} budget'
-                        : 'Replace budget with this amount',
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-            ],
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Theme.of(
-                  context,
-                ).colorScheme.primary.withValues(alpha: 0.06),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Based on your numbers',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.4,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  _calcRow(
-                    'Daily target',
-                    dailyTarget == null
-                        ? 'Set a budget first'
-                        : 'RM${dailyTarget.toStringAsFixed(2)} / day',
-                  ),
-                  const SizedBox(height: 6),
-                  if (widget.monthlyBudget != null)
-                    _calcRow(
-                      'Spent so far',
-                      'RM${widget.totalSpent.toStringAsFixed(2)}',
-                    ),
-                  const SizedBox(height: 6),
-                  _allowanceRow(allowance, widget.remaining, remainingDays),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
