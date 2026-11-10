@@ -1,10 +1,3 @@
-buildscript {
-    dependencies {
-        classpath(
-            "org.jetbrains.kotlin:kotlin-gradle-plugin:2.3.20"
-        )
-    }
-}
 allprojects {
     repositories {
         google()
@@ -22,6 +15,7 @@ subprojects {
     val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
     project.layout.buildDirectory.value(newSubprojectBuildDir)
 }
+
 subprojects {
     project.evaluationDependsOn(":app")
 }
