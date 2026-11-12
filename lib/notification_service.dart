@@ -8,14 +8,12 @@ class NotificationService {
   static final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
 
-  /// Invoked when the user taps a scheduled notification.
-  /// The payload format is set by scheduleTask / scheduleWeekly callers:
-  /// `task:<id>` or `schedule:<id>:<weekday>`.
+  // Called when a user taps on a notification.
+  // Payloads are used to identify the related task or schedule.
   static void Function(String? payload)? onNotificationTap;
 
-  /// Exact alarms keep reminders on time (Android can batch/delay
-  /// inexact ones by 15-30 min in Doze). Downgraded to inexact if the
-  /// OS denies or later revokes the permission.
+  // Use exact alarms when permission is available.
+  // Otherwise, Android will use inexact alarms.
   static AndroidScheduleMode _scheduleMode =
       AndroidScheduleMode.inexactAllowWhileIdle;
 
@@ -32,14 +30,13 @@ class NotificationService {
   static Future<void> init() async {
     tz.initializeTimeZones();
 
-    // Use the device's real timezone so travelling users still get
-    // reminders at the right local time; fall back to Kuala Lumpur
-    // when the platform reports an ID the timezone DB lacks
-    // (older Android returns raw "GMT+08:00"-style strings).
+    // Get the device timezone so notifications follow the user's
+    // local time, even when they travel.
     try {
       final deviceTz = await FlutterTimezone.getLocalTimezone();
       tz.setLocalLocation(tz.getLocation(deviceTz.identifier));
     } catch (_) {
+      // Use Kuala Lumpur timezone if the device timezone is unavailable.
       tz.setLocalLocation(tz.getLocation('Asia/Kuala_Lumpur'));
     }
 
@@ -61,15 +58,15 @@ class NotificationService {
 
     await androidPlugin?.requestNotificationsPermission();
 
-    // Prefer exact alarms so reminders arrive on time; the OS may deny
-    // them (permission revoked by the user) — then keep inexact mode.
+    // Check whether Android allows exact alarms.
     try {
       final canExact = await androidPlugin?.canScheduleExactNotifications();
+
       if (canExact == true) {
         _scheduleMode = AndroidScheduleMode.exactAllowWhileIdle;
       }
     } catch (_) {
-      // Older OS or plugin without the API — inexact mode stays.
+      // Keep using inexact alarms if the check is unavailable.
     }
   }
 
@@ -98,10 +95,12 @@ class NotificationService {
     String? payload,
     String? detail,
   }) async {
-    // null / negative = no reminder for this item.
+    // Skip the reminder if it is disabled.
     if (reminderMinutes == null || reminderMinutes < 0) return;
+
     final reminder = dateTime.subtract(Duration(minutes: reminderMinutes));
 
+    // No need to schedule a notification if its time has passed.
     if (!reminder.isAfter(DateTime.now())) {
       return;
     }
@@ -129,10 +128,12 @@ class NotificationService {
     String? payload,
     String? detail,
   }) async {
-    // null / negative = no reminder for this item.
+    // Skip the reminder if it is disabled.
     if (reminderMinutes == null || reminderMinutes < 0) return;
+
     final now = tz.TZDateTime.now(tz.local);
 
+    // Find the next matching weekday.
     int daysUntil = weekday - now.weekday;
 
     if (daysUntil < 0) {
@@ -148,13 +149,15 @@ class NotificationService {
       minute,
     ).add(Duration(days: daysUntil));
 
+    // If the selected time has already passed today,
+    // move the notification to the following week.
     if (!scheduled.isAfter(now)) {
       scheduled = scheduled.add(const Duration(days: 7));
     }
 
     final reminder = scheduled.subtract(Duration(minutes: reminderMinutes));
 
-    // If the reminder has already passed, move it to next week.
+    // Move to next week if the reminder time has already passed.
     if (!reminder.isAfter(now)) {
       scheduled = scheduled.add(const Duration(days: 7));
     }
@@ -162,7 +165,8 @@ class NotificationService {
     await _schedule(
       id: id,
       title: title,
-      body: detail ??
+      body:
+          detail ??
           'Starts ${hour.toString().padLeft(2, '0')}:'
               '${minute.toString().padLeft(2, '0')}',
       scheduledDate: tz.TZDateTime(
@@ -179,7 +183,7 @@ class NotificationService {
   }
 
   // ==========================================================
-  // SCHEDULER (exact first, inexact fallback)
+  // SCHEDULER
   // ==========================================================
 
   static Future<void> _schedule({
@@ -206,18 +210,17 @@ class NotificationService {
     try {
       await schedule(_scheduleMode);
     } on PlatformException {
-      // Exact-alarm permission denied or revoked — downgrade permanently
-      // for this session so every later schedule still succeeds.
+      // Switch to inexact alarms if Android blocks exact alarms.
       _scheduleMode = AndroidScheduleMode.inexactAllowWhileIdle;
       await schedule(_scheduleMode);
     } catch (e) {
-      // Last resort: a late reminder beats no reminder.
+      // Try inexact alarms if scheduling fails for another reason.
       await schedule(AndroidScheduleMode.inexactAllowWhileIdle);
     }
   }
 
   // ==========================================================
-  // CANCEL
+  // CANCEL NOTIFICATIONS
   // ==========================================================
 
   static Future<void> cancel(int id) async {

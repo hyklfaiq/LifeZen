@@ -45,15 +45,11 @@ class SchedulePage extends StatefulWidget {
 }
 
 class _SchedulePageState extends State<SchedulePage> {
-  // ===========================================================================
-  // VIEW MODE
-  // ===========================================================================
+  // View Mode
 
   ScheduleViewMode _viewMode = ScheduleViewMode.fixed;
 
-  // ===========================================================================
-  // ZOOM CONTROLLER
-  // ===========================================================================
+  // Zoom Controller
 
   final TransformationController _scheduleTransformController =
       TransformationController();
@@ -88,9 +84,7 @@ class _SchedulePageState extends State<SchedulePage> {
     super.dispose();
   }
 
-  // ===========================================================================
-  // EXPORT: BOTTOM SHEET
-  // ===========================================================================
+  // Export Bottom Sheet
 
   Future<void> _showExportSheet() async {
     if (widget.schedule.isEmpty) return;
@@ -162,9 +156,7 @@ class _SchedulePageState extends State<SchedulePage> {
     );
   }
 
-  // ===========================================================================
-  // EXPORT: SHARE LOGIC + PNG CAPTURE
-  // ===========================================================================
+  // Export Share Logic + Png Capture
 
   String _exportStamp() {
     final now = DateTime.now();
@@ -357,14 +349,11 @@ class _SchedulePageState extends State<SchedulePage> {
     return getApplicationDocumentsDirectory();
   }
 
-  // ===========================================================================
-  // PNG CAPTURE
-  // ===========================================================================
+  // Png Capture
 
   Future<Uint8List?> _captureGridPng() async {
-    // Render a dedicated offscreen export widget.
-    // PNG export intentionally hides the date and keeps only
-    // the weekday name in the header.
+    // Build a separate timetable for the image so it does not depend on
+    // the current scroll position. The exported header shows weekdays only.
 
     final isZoom = _viewMode == ScheduleViewMode.zoom;
 
@@ -464,13 +453,20 @@ class _SchedulePageState extends State<SchedulePage> {
       if (renderObject is RenderRepaintBoundary) {
         final image = await renderObject.toImage(pixelRatio: 3.0);
 
-        final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+        try {
+          final byteData = await image.toByteData(
+            format: ui.ImageByteFormat.png,
+          );
 
-        if (byteData == null) {
-          return null;
+          if (byteData == null) {
+            return null;
+          }
+
+          return byteData.buffer.asUint8List();
+        } finally {
+          // Release the image once its bytes have been read.
+          image.dispose();
         }
-
-        return byteData.buffer.asUint8List();
       }
 
       return null;
@@ -485,9 +481,7 @@ class _SchedulePageState extends State<SchedulePage> {
     return (width - 58.0 - 32.0) / 7;
   }
 
-  // ===========================================================================
-  // i-MA'LUUM IMPORT
-  // ===========================================================================
+  // I-Ma'Luum Import
 
   Future<void> _openImaluumImport() async {
     if (!mounted) return;
@@ -499,9 +493,7 @@ class _SchedulePageState extends State<SchedulePage> {
     );
   }
 
-  // ===========================================================================
-  // CLEAR ALL
-  // ===========================================================================
+  // Clear All
 
   Future<void> _clearAll() async {
     if (widget.schedule.isEmpty) return;
@@ -541,9 +533,7 @@ class _SchedulePageState extends State<SchedulePage> {
     await widget.onClearAll();
   }
 
-  // ===========================================================================
-  // ADD / EDIT SCHEDULE
-  // ===========================================================================
+  // Add / Edit Schedule
 
   Future<void> showScheduleDialog({ScheduleItem? existing}) async {
     final result = await showDialog<ScheduleItem>(
@@ -564,9 +554,7 @@ class _SchedulePageState extends State<SchedulePage> {
     }
   }
 
-  // ===========================================================================
-  // FIRST DAY OF WEEK
-  // ===========================================================================
+  // First Day Of Week
 
   Future<void> showFirstDayDialog() async {
     const days = [
@@ -638,9 +626,7 @@ class _SchedulePageState extends State<SchedulePage> {
     await widget.onFirstDayChanged(result);
   }
 
-  // ===========================================================================
-  // VIEW MODE DIALOG
-  // ===========================================================================
+  // View Mode Dialog
 
   Future<void> _showViewModeDialog() async {
     final result = await showDialog<ScheduleViewMode>(
@@ -714,9 +700,7 @@ class _SchedulePageState extends State<SchedulePage> {
     });
   }
 
-  // ===========================================================================
-  // SETTINGS
-  // ===========================================================================
+  // Settings
 
   Future<void> _openSettings() async {
     await showModalBottomSheet<void>(
@@ -765,9 +749,7 @@ class _SchedulePageState extends State<SchedulePage> {
     );
   }
 
-  // ===========================================================================
-  // WEEK HELPERS
-  // ===========================================================================
+  // Week Helpers
 
   DateTime _weekStart() {
     final today = DateTime.now();
@@ -816,9 +798,7 @@ class _SchedulePageState extends State<SchedulePage> {
     return '$displayHour $period';
   }
 
-  // ===========================================================================
-  // TIMETABLE DIMENSIONS
-  // ===========================================================================
+  // Timetable Dimensions
 
   Map<String, dynamic> _getTimetableDimensions({
     required bool isLandscape,
@@ -872,9 +852,7 @@ class _SchedulePageState extends State<SchedulePage> {
     };
   }
 
-  // ===========================================================================
-  // FIXED MODE
-  // ===========================================================================
+  // Fixed Mode
 
   Widget _buildFixedSchedule() {
     final weekStart = _weekStart();
@@ -954,9 +932,7 @@ class _SchedulePageState extends State<SchedulePage> {
     );
   }
 
-  // ===========================================================================
-  // ZOOM MODE
-  // ===========================================================================
+  // Zoom Mode
 
   Widget _buildZoomSchedule() {
     final weekStart = _weekStart();
@@ -994,7 +970,9 @@ class _SchedulePageState extends State<SchedulePage> {
       builder: (context, constraints) {
         final availableWidth = constraints.maxWidth - 16;
 
-        final overviewScale = (availableWidth / totalWidth).clamp(0.35, 1.0);
+        final overviewScale = (availableWidth / totalWidth)
+            .clamp(0.35, 1.0)
+            .toDouble();
 
         if (!_scheduleInitialised) {
           _scheduleInitialised = true;
@@ -1065,9 +1043,7 @@ class _SchedulePageState extends State<SchedulePage> {
     );
   }
 
-  // ===========================================================================
-  // DAY HEADER
-  // ===========================================================================
+  // Day Header
 
   Widget _buildDayHeader({
     required DateTime weekStart,
@@ -1158,9 +1134,7 @@ class _SchedulePageState extends State<SchedulePage> {
     );
   }
 
-  // ===========================================================================
-  // GRID
-  // ===========================================================================
+  // Grid
 
   Widget _buildGrid({
     required List<int> orderedDays,
@@ -1176,9 +1150,7 @@ class _SchedulePageState extends State<SchedulePage> {
       height: gridHeight,
       child: Stack(
         children: [
-          // -------------------------------------------------------------------
-          // FULL HOUR LINES
-          // -------------------------------------------------------------------
+          // Full hour lines
           ...List.generate(lastHour - firstHour + 1, (index) {
             final hour = firstHour + index;
 
@@ -1211,9 +1183,7 @@ class _SchedulePageState extends State<SchedulePage> {
             );
           }),
 
-          // -------------------------------------------------------------------
-          // HALF HOUR LINES
-          // -------------------------------------------------------------------
+          // Half hour lines
           ...List.generate(lastHour - firstHour, (index) {
             return Positioned(
               top: (index * hourHeight) + (hourHeight / 2),
@@ -1228,9 +1198,7 @@ class _SchedulePageState extends State<SchedulePage> {
             );
           }),
 
-          // -------------------------------------------------------------------
-          // VERTICAL DAY SEPARATORS
-          // -------------------------------------------------------------------
+          // Vertical day separators
           Positioned(
             left: timeColumnWidth,
             top: 0,
@@ -1252,9 +1220,7 @@ class _SchedulePageState extends State<SchedulePage> {
             ),
           ),
 
-          // -------------------------------------------------------------------
-          // SCHEDULE CARDS
-          // -------------------------------------------------------------------
+          // Schedule cards
           ...List.generate(orderedDays.length, (index) {
             final weekday = orderedDays[index];
 
@@ -1289,9 +1255,7 @@ class _SchedulePageState extends State<SchedulePage> {
             );
           }),
 
-          // -------------------------------------------------------------------
-          // NOW BAR
-          // -------------------------------------------------------------------
+          // Now bar
           _buildNowIndicator(
             orderedDays: orderedDays,
             dayWidth: dayWidth,
@@ -1384,9 +1348,7 @@ class _SchedulePageState extends State<SchedulePage> {
     );
   }
 
-  // ===========================================================================
-  // SCHEDULE CARD
-  // ===========================================================================
+  // Schedule Card
 
   Widget _gridScheduleCard(
     ScheduleItem item,
@@ -1471,9 +1433,8 @@ class _SchedulePageState extends State<SchedulePage> {
           : null;
 
       if (rawCode == null || rawCode.isEmpty) {
-        // Manual classes have no course code, so the card shows the full
-        // title. Keep a readable font size and wrap with ellipsis instead
-        // of letting FittedBox scale the text down to a few pixels.
+        // Without a course code, show the class title and let it wrap
+        // rather than shrinking it until it becomes hard to read.
         final maxLines = height >= 70
             ? 3
             : height >= 45
@@ -1651,9 +1612,7 @@ class _SchedulePageState extends State<SchedulePage> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // -------------------------------------------------------------
-                // EVENT CONTENT
-                // -------------------------------------------------------------
+                // Event content
                 Expanded(
                   child: Padding(
                     padding: compact
@@ -1663,9 +1622,7 @@ class _SchedulePageState extends State<SchedulePage> {
                   ),
                 ),
 
-                // -------------------------------------------------------------
-                // RIGHT-SIDE COLOR BAR
-                // -------------------------------------------------------------
+                // Right-side color bar
                 Container(
                   width: 4,
                   decoration: BoxDecoration(
@@ -1684,9 +1641,7 @@ class _SchedulePageState extends State<SchedulePage> {
     );
   }
 
-  // ===========================================================================
-  // NO FIXED TIME SECTION
-  // ===========================================================================
+  // No Fixed Time Section
 
   List<ScheduleItem> get _untimedItems =>
       widget.schedule.where((item) => !item.hasTime).toList();
@@ -1839,9 +1794,7 @@ class _SchedulePageState extends State<SchedulePage> {
     );
   }
 
-  // ===========================================================================
-  // BUILD
-  // ===========================================================================
+  // Build
 
   @override
   Widget build(BuildContext context) {
@@ -1853,9 +1806,7 @@ class _SchedulePageState extends State<SchedulePage> {
     return SafeArea(
       child: Column(
         children: [
-          // -------------------------------------------------------------------
-          // HEADER
-          // -------------------------------------------------------------------
+          // Header
           Padding(
             padding: EdgeInsets.fromLTRB(
               20,
@@ -1930,9 +1881,7 @@ class _SchedulePageState extends State<SchedulePage> {
             ),
           ),
 
-          // -------------------------------------------------------------------
-          // WEEK START
-          // -------------------------------------------------------------------
+          // Week start
           Padding(
             padding: EdgeInsets.symmetric(
               horizontal: 20,
@@ -1957,9 +1906,7 @@ class _SchedulePageState extends State<SchedulePage> {
             ),
           ),
 
-          // -------------------------------------------------------------------
-          // VIEW MODE HINT
-          // -------------------------------------------------------------------
+          // View mode hint
           if (widget.schedule.isNotEmpty)
             Padding(
               padding: EdgeInsets.fromLTRB(20, isLandscape ? 2 : 8, 20, 0),
@@ -1991,14 +1938,10 @@ class _SchedulePageState extends State<SchedulePage> {
 
           SizedBox(height: isLandscape ? 4 : 12),
 
-          // -------------------------------------------------------------------
-          // NO FIXED TIME
-          // -------------------------------------------------------------------
+          // No fixed time
           if (_untimedItems.isNotEmpty) _buildUntimedSection(isLandscape),
 
-          // -------------------------------------------------------------------
-          // CONTENT
-          // -------------------------------------------------------------------
+          // Content
           Expanded(
             child: widget.schedule.isEmpty
                 ? Center(
@@ -2035,9 +1978,7 @@ class _SchedulePageState extends State<SchedulePage> {
   }
 }
 
-// =============================================================================
-// SCHEDULE EDITOR
-// =============================================================================
+// Schedule Editor
 
 class _ScheduleEditorDialog extends StatefulWidget {
   final ScheduleItem? existing;
@@ -2049,15 +1990,11 @@ class _ScheduleEditorDialog extends StatefulWidget {
 }
 
 class _ScheduleEditorDialogState extends State<_ScheduleEditorDialog> {
-  // ===========================================================================
-  // BASIC
-  // ===========================================================================
+  // Basic
 
   late final TextEditingController titleController;
 
-  // ===========================================================================
-  // CLASS DETAILS
-  // ===========================================================================
+  // Class Details
 
   late final TextEditingController courseCodeController;
 
@@ -2071,25 +2008,20 @@ class _ScheduleEditorDialogState extends State<_ScheduleEditorDialog> {
 
   late final TextEditingController semesterController;
 
-  // ===========================================================================
-  // TIME / DAYS
-  // ===========================================================================
+  // Time / Days
 
   late TimeOfDay selectedTime;
   late TimeOfDay selectedEndTime;
   late List<int> selectedDays;
 
-  // ===========================================================================
-  // UI STATE
-  // ===========================================================================
+  // Ui State
 
   bool showDetails = false;
 
-  /// Mirrors [ScheduleItem.hasTime]: when false the item belongs to the
-  /// "No fixed time" section and the time/repeat controls are hidden.
+  /// Turn this on for items that should appear outside the weekly grid.
   bool noFixedTime = false;
 
-  /// Per-item reminder: null = use the schedule default, -1 = none.
+  /// Reminder for this item. A value of -1 means no reminder.
   int? reminderMinutes;
 
   @override
@@ -2099,8 +2031,7 @@ class _ScheduleEditorDialogState extends State<_ScheduleEditorDialog> {
     final existing = widget.existing;
 
     noFixedTime = existing != null && !existing.hasTime;
-    // Schedules default to 10 min before; null legacy data also
-    // resolves to 10 so old items keep notifying.
+    // Keep the 10-minute reminder for older items that have no value saved.
     reminderMinutes = existing?.reminderMinutes ?? 10;
 
     titleController = TextEditingController(text: existing?.title ?? '');
@@ -2160,9 +2091,7 @@ class _ScheduleEditorDialogState extends State<_ScheduleEditorDialog> {
     super.dispose();
   }
 
-  // ===========================================================================
-  // START TIME
-  // ===========================================================================
+  // Start Time
 
   Future<void> _pickStartTime() async {
     final picked = await showTimePicker(
@@ -2189,9 +2118,7 @@ class _ScheduleEditorDialogState extends State<_ScheduleEditorDialog> {
     });
   }
 
-  // ===========================================================================
-  // END TIME
-  // ===========================================================================
+  // End Time
 
   Future<void> _pickEndTime() async {
     final picked = await showTimePicker(
@@ -2220,9 +2147,7 @@ class _ScheduleEditorDialogState extends State<_ScheduleEditorDialog> {
     });
   }
 
-  // ===========================================================================
-  // DAY SELECTION
-  // ===========================================================================
+  // Day Selection
 
   void _toggleDay(int day, bool selected) {
     setState(() {
@@ -2238,9 +2163,7 @@ class _ScheduleEditorDialogState extends State<_ScheduleEditorDialog> {
     });
   }
 
-  // ===========================================================================
-  // SAVE
-  // ===========================================================================
+  // Save
 
   void _save() {
     final title = titleController.text.trim();
@@ -2309,9 +2232,7 @@ class _ScheduleEditorDialogState extends State<_ScheduleEditorDialog> {
     Navigator.of(context).pop(item);
   }
 
-  // ===========================================================================
-  // FIELD
-  // ===========================================================================
+  // Field
 
   Widget _detailTextField({
     required TextEditingController controller,
@@ -2331,9 +2252,7 @@ class _ScheduleEditorDialogState extends State<_ScheduleEditorDialog> {
     );
   }
 
-  // ===========================================================================
-  // BUILD
-  // ===========================================================================
+  // Build
 
   @override
   Widget build(BuildContext context) {
@@ -2353,9 +2272,7 @@ class _ScheduleEditorDialogState extends State<_ScheduleEditorDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // -----------------------------------------------------------------
-              // SCHEDULE NAME
-              // -----------------------------------------------------------------
+              // Schedule name
               TextField(
                 controller: titleController,
                 autofocus: !isEditing,
@@ -2370,9 +2287,7 @@ class _ScheduleEditorDialogState extends State<_ScheduleEditorDialog> {
 
               const SizedBox(height: 12),
 
-              // -----------------------------------------------------------------
-              // DETAILS TOGGLE
-              // -----------------------------------------------------------------
+              // Details toggle
               Container(
                 decoration: BoxDecoration(
                   border: Border.all(
@@ -2398,9 +2313,7 @@ class _ScheduleEditorDialogState extends State<_ScheduleEditorDialog> {
                 ),
               ),
 
-              // -----------------------------------------------------------------
-              // CLASS DETAILS
-              // -----------------------------------------------------------------
+              // Class details
               if (showDetails) ...[
                 const SizedBox(height: 12),
 
@@ -2465,9 +2378,7 @@ class _ScheduleEditorDialogState extends State<_ScheduleEditorDialog> {
 
               const SizedBox(height: 16),
 
-              // -----------------------------------------------------------------
-              // NO FIXED TIME
-              // -----------------------------------------------------------------
+              // No fixed time
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text(
@@ -2486,9 +2397,7 @@ class _ScheduleEditorDialogState extends State<_ScheduleEditorDialog> {
               ),
 
               if (!noFixedTime) ...[
-                // ---------------------------------------------------------------
-                // START TIME
-                // ---------------------------------------------------------------
+                // Start time
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.access_time),
@@ -2497,9 +2406,7 @@ class _ScheduleEditorDialogState extends State<_ScheduleEditorDialog> {
                   onTap: _pickStartTime,
                 ),
 
-                // ---------------------------------------------------------------
-                // END TIME
-                // ---------------------------------------------------------------
+                // End time
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.timelapse_outlined),
@@ -2510,9 +2417,7 @@ class _ScheduleEditorDialogState extends State<_ScheduleEditorDialog> {
 
                 const SizedBox(height: 8),
 
-                // ---------------------------------------------------------------
-                // REMINDER (preset + custom, per item)
-                // ---------------------------------------------------------------
+                // Reminder (preset + custom, per item)
                 const Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
@@ -2531,9 +2436,7 @@ class _ScheduleEditorDialogState extends State<_ScheduleEditorDialog> {
 
                 const SizedBox(height: 12),
 
-                // ---------------------------------------------------------------
-                // REPEAT
-                // ---------------------------------------------------------------
+                // Repeat
                 const Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
@@ -2567,9 +2470,7 @@ class _ScheduleEditorDialogState extends State<_ScheduleEditorDialog> {
         ),
       ),
 
-      // -----------------------------------------------------------------------
-      // ACTIONS
-      // -----------------------------------------------------------------------
+      // Actions
       actions: [
         TextButton(
           onPressed: () {

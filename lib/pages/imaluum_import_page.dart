@@ -31,9 +31,6 @@ class _ImaluumImportPageState extends State<ImaluumImportPage> {
 
   int _pageSerial = 0;
 
-  /// Re-entrancy guard: [_autoPoll] is async, so timer ticks and navigation
-  /// callbacks could otherwise overlap and stack heavy DOM reads on top of
-  /// each other, freezing the page inside the WebView.
   bool _polling = false;
 
   List<ImaluumMeeting> _meetings = const [];

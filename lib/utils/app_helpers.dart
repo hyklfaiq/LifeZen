@@ -13,36 +13,45 @@ String formatDateTime(DateTime date) {
   return '${formatDate(date)} $hour:$minute';
 }
 
-/// Human label for a reminder lead time.
-/// `null` (or negative) means no reminder.
+// Returns a readable label for the reminder time.
+// A null value uses the fallback, while a negative value means no reminder.
 String formatReminderLabel(int? minutes, {int? fallbackMinutes}) {
   final value = minutes ?? fallbackMinutes;
+
   if (minutes != null && minutes < 0) return 'None';
   if (value == null) return 'Default';
   if (value < 0) return 'None';
   if (value == 0) return 'At time';
-  if (value < 60) return '$value min before';
+
+  if (value < 60) {
+    return '$value min before';
+  }
+
   if (value % 1440 == 0) {
     final days = value ~/ 1440;
     return days == 1 ? '1 day before' : '$days days before';
   }
+
   if (value % 60 == 0) {
     final hours = value ~/ 60;
     return hours == 1 ? '1 hour before' : '$hours hours before';
   }
+
   final hours = value ~/ 60;
   final mins = value % 60;
+
   return '${hours}h ${mins}m before';
 }
 
-/// Preset + custom reminder picker shared by tasks and schedule.
-///
-/// Behavior:
-/// - Task mode (allowUseDefault true): value == null means smart default
-///   (none / 9 AM due / 10 min before scheduled).
-/// - Schedule mode (allowUseDefault false): concrete value, default 10.
-/// - value == -1: no reminder. value >= 0: minutes before
-///   (0 = at time / 9 AM sharp for due-only tasks).
+// Shared reminder picker used by tasks and weekly schedules.
+//
+// Task mode:
+// - null uses the smart default.
+// - -1 disables the reminder.
+// - 0 means the reminder is sent at the scheduled time.
+//
+// Schedule mode:
+// - Uses a fixed reminder value, with 10 minutes as the default.
 class ReminderPicker extends StatelessWidget {
   const ReminderPicker({
     super.key,
@@ -61,22 +70,27 @@ class ReminderPicker extends StatelessWidget {
   final ValueChanged<int?> onChanged;
   final bool allowUseDefault;
 
-  /// Slim sheet presets only; anything else goes through Custom.
+  // Common options shown in the reminder picker.
   static const List<int> presets = [0, 10, 30, 60];
 
-  /// Marker values that never reach onChanged.
+  // Used internally to distinguish special picker options.
   static const int _smartSentinel = -999998;
   static const int _customSentinel = -999999;
 
   String _smartLabel() {
     if (smartDoAt != null) return '10 min before scheduled time';
     if (smartDueDate != null) return '9:00 AM on due date';
+
     return 'No notification';
   }
 
   String _currentLabel() {
-    if (value == null) return 'Smart: ${_smartLabel()}';
+    if (value == null) {
+      return 'Smart: ${_smartLabel()}';
+    }
+
     if (value! < 0) return 'None';
+
     return formatReminderLabel(value);
   }
 
@@ -85,7 +99,10 @@ class ReminderPicker extends StatelessWidget {
       context: context,
       builder: (context) => const _CustomReminderDialog(),
     );
-    if (result != null) onChanged(result);
+
+    if (result != null) {
+      onChanged(result);
+    }
   }
 
   Future<void> _openSheet(BuildContext context) async {
@@ -98,14 +115,17 @@ class ReminderPicker extends StatelessWidget {
           -1,
           ...presets,
         ];
-        // A saved custom value stays selectable even if not a preset.
+
+        // Keep saved custom values available in the picker.
         final isCustom =
             value != null && value! >= 0 && !presets.contains(value);
+
         final group = value == null
             ? _smartSentinel
             : (value! >= 0 && !presets.contains(value)
-                ? _customSentinel
-                : value);
+                  ? _customSentinel
+                  : value);
+
         return SafeArea(
           child: SingleChildScrollView(
             child: Column(
@@ -119,7 +139,9 @@ class ReminderPicker extends StatelessWidget {
                 ),
                 RadioGroup<int>(
                   groupValue: group,
-                  onChanged: (v) => Navigator.of(sheetContext).pop(v),
+                  onChanged: (v) {
+                    Navigator.of(sheetContext).pop(v);
+                  },
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -130,16 +152,16 @@ class ReminderPicker extends StatelessWidget {
                             option == _smartSentinel
                                 ? 'Smart default'
                                 : option == -1
-                                    ? 'None'
-                                    : formatReminderLabel(option),
+                                ? 'None'
+                                : formatReminderLabel(option),
                           ),
                           subtitle: option == _smartSentinel
                               ? Text(
                                   _smartLabel(),
                                   style: TextStyle(
-                                    color: Theme.of(sheetContext)
-                                        .colorScheme
-                                        .onSurfaceVariant,
+                                    color: Theme.of(
+                                      sheetContext,
+                                    ).colorScheme.onSurfaceVariant,
                                   ),
                                 )
                               : null,
@@ -157,7 +179,9 @@ class ReminderPicker extends StatelessWidget {
                   leading: const Icon(Icons.tune),
                   title: const Text('Custom...'),
                   subtitle: const Text('Pick any amount up to 7 days'),
-                  onTap: () => Navigator.of(sheetContext).pop(_customSentinel),
+                  onTap: () {
+                    Navigator.of(sheetContext).pop(_customSentinel);
+                  },
                 ),
                 const SizedBox(height: 8),
               ],
@@ -166,7 +190,9 @@ class ReminderPicker extends StatelessWidget {
         );
       },
     );
+
     if (!context.mounted) return;
+
     if (selected == _customSentinel) {
       await _pickCustom(context);
     } else if (selected == _smartSentinel) {
@@ -198,6 +224,7 @@ class _CustomReminderDialog extends StatefulWidget {
 
 class _CustomReminderDialogState extends State<_CustomReminderDialog> {
   final _controller = TextEditingController(text: '15');
+
   String _unit = 'minutes';
 
   @override
@@ -208,13 +235,16 @@ class _CustomReminderDialogState extends State<_CustomReminderDialog> {
 
   void _submit() {
     final amount = int.tryParse(_controller.text.trim());
+
     if (amount == null || amount < 0) return;
+
     final minutes = switch (_unit) {
       'hours' => amount * 60,
       'days' => amount * 1440,
       _ => amount,
     };
-    // Cap at 7 days so weekly schedules stay sane.
+
+    // Limit custom reminders to 7 days.
     Navigator.of(context).pop(minutes.clamp(0, 10080));
   }
 
@@ -241,7 +271,9 @@ class _CustomReminderDialogState extends State<_CustomReminderDialog> {
               DropdownMenuItem(value: 'hours', child: Text('hours')),
               DropdownMenuItem(value: 'days', child: Text('days')),
             ],
-            onChanged: (v) => setState(() => _unit = v ?? 'minutes'),
+            onChanged: (v) {
+              setState(() => _unit = v ?? 'minutes');
+            },
           ),
         ],
       ),
@@ -256,7 +288,7 @@ class _CustomReminderDialogState extends State<_CustomReminderDialog> {
   }
 }
 
-
+// Formats a TimeOfDay into a 12-hour time string.
 String formatTimeOfDay(TimeOfDay time) {
   final hour = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
   final minute = time.minute.toString().padLeft(2, '0');
@@ -265,6 +297,7 @@ String formatTimeOfDay(TimeOfDay time) {
   return '$hour:$minute $period';
 }
 
+// Converts a duration into hours and minutes.
 String formatDuration(Duration duration) {
   final hours = duration.inHours;
   final minutes = duration.inMinutes.remainder(60);
@@ -276,6 +309,7 @@ String formatDuration(Duration duration) {
   return '${hours}h ${minutes}m';
 }
 
+// Gives a simple rating based on the total sleep time.
 String sleepQuality(Duration duration) {
   final hours = duration.inMinutes / 60;
 
@@ -290,6 +324,7 @@ String sleepQuality(Duration duration) {
   return 'Low';
 }
 
+// Returns an icon based on the selected expense category.
 IconData categoryIcon(String category) {
   switch (category) {
     case 'Food':
@@ -311,6 +346,7 @@ IconData categoryIcon(String category) {
   }
 }
 
+// Opens the date picker followed by the time picker.
 Future<DateTime?> pickDateTime(BuildContext context, DateTime initial) async {
   final date = await showDatePicker(
     context: context,
@@ -319,26 +355,16 @@ Future<DateTime?> pickDateTime(BuildContext context, DateTime initial) async {
     lastDate: DateTime(2035),
   );
 
-  if (date == null) {
-    return null;
-  }
-
-  if (!context.mounted) {
-    return null;
-  }
+  if (date == null) return null;
+  if (!context.mounted) return null;
 
   final time = await showTimePicker(
     context: context,
     initialTime: TimeOfDay.fromDateTime(initial),
   );
 
-  if (time == null) {
-    return null;
-  }
-
-  if (!context.mounted) {
-    return null;
-  }
+  if (time == null) return null;
+  if (!context.mounted) return null;
 
   return DateTime(date.year, date.month, date.day, time.hour, time.minute);
 }

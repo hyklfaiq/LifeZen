@@ -50,9 +50,11 @@ class _PlannerPageState extends State<PlannerPage> {
     } else if (task.doAt != null) {
       parts.add(formatReminderLabel(effective));
     } else {
-      // Due-only: anchor is 9 AM on the due date.
+      // For tasks with only a due date, reminders use 9 AM as the default time.
       parts.add(
-        effective == 0 ? '9:00 AM' : '9:00 AM (${formatReminderLabel(effective)})',
+        effective == 0
+            ? '9:00 AM'
+            : '9:00 AM (${formatReminderLabel(effective)})',
       );
     }
     return parts.join('  •  ');
@@ -98,10 +100,7 @@ class _PlannerPageState extends State<PlannerPage> {
       context: context,
       barrierDismissible: true,
       builder: (dialogContext) {
-        return _TaskEditorDialog(
-          initialDate: selectedDate,
-          existing: task,
-        );
+        return _TaskEditorDialog(initialDate: selectedDate, existing: task);
       },
     );
 
@@ -317,9 +316,7 @@ class _PlannerPageState extends State<PlannerPage> {
             vertical: isLandscape ? 2 : 4,
           ),
 
-          // FIX:
-          // MainScreen owns the task state.
-          // It updates the task + calls setState immediately.
+          // MainScreen handles the task update and refreshes the UI.
           leading: Checkbox(
             value: task.completed,
             onChanged: (_) {
@@ -363,14 +360,13 @@ class _PlannerPageState extends State<PlannerPage> {
   }
 
   Widget _buildTasks(bool isLandscape) {
-    final selectedTasks = widget.tasks
-        .where((task) {
-          final d = task.displayDate;
-          return d != null && _isSameDay(d, selectedDate);
-        })
+    final selectedTasks = widget.tasks.where((task) {
+      final d = task.displayDate;
+      return d != null && _isSameDay(d, selectedDate);
+    }).toList();
+    final floatingTasks = widget.tasks
+        .where((task) => task.isFloating)
         .toList();
-    final floatingTasks =
-        widget.tasks.where((task) => task.isFloating).toList();
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
@@ -570,10 +566,7 @@ class _PlannerPageState extends State<PlannerPage> {
 // ============================================================
 
 class _TaskEditorDialog extends StatefulWidget {
-  const _TaskEditorDialog({
-    required this.initialDate,
-    this.existing,
-  });
+  const _TaskEditorDialog({required this.initialDate, this.existing});
 
   final DateTime initialDate;
   final Task? existing;
@@ -626,10 +619,7 @@ class _TaskEditorDialogState extends State<_TaskEditorDialog> {
   }
 
   Future<void> _pickDoAt() async {
-    final picked = await pickDateTime(
-      context,
-      _doAt ?? widget.initialDate,
-    );
+    final picked = await pickDateTime(context, _doAt ?? widget.initialDate);
     if (!mounted || picked == null) return;
     setState(() {
       _doAt = picked;
@@ -655,9 +645,10 @@ class _TaskEditorDialogState extends State<_TaskEditorDialog> {
     );
   }
 
-  /// Live hint describing what the current selection will do.
+  // Shows when the reminder will be sent based on the selected dates.
   String _reminderHint() {
-    final effective = _reminderMinutes ??
+    final effective =
+        _reminderMinutes ??
         Task.smartDefaultReminder(dueDate: _dueDate, doAt: _doAt);
     if (effective < 0) return 'No notification will be scheduled.';
     if (_doAt != null) {
@@ -666,8 +657,8 @@ class _TaskEditorDialogState extends State<_TaskEditorDialog> {
           'Notifies ${formatDateTime(at)} '
           '(${formatReminderLabel(effective)}).';
       if (_dueDate != null) {
-        // The planned time drives the main reminder; the deadline gets
-        // its own notification at 9:00 AM on the due date.
+        // The main reminder follows the planned time.
+        // The due date has a separate reminder at 9 AM.
         final dueLead = _reminderMinutes ?? 0;
         final dueAt = DateTime(
           _dueDate!.year,
@@ -776,8 +767,8 @@ class _TaskEditorDialogState extends State<_TaskEditorDialog> {
 
             const SizedBox(height: 12),
 
-            // The reminder only makes sense once the task has an anchor
-            // (due date or planned time) — floating tasks never notify.
+            // Reminders are only available when a due date or planned time is set.
+            // Floating tasks do not send notifications.
             if (_dueDate != null || _doAt != null) ...[
               const Text(
                 'Reminder',

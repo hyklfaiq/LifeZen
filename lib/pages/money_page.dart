@@ -1647,11 +1647,12 @@ class _ExpenseDonutPainter extends CustomPainter {
 // DAILY BUDGET CALCULATOR
 // ============================================================================
 
-/// Daily target <-> monthly budget converter + remaining daily allowance.
+/// Converts a daily budget into a monthly budget and shows the remaining
+/// daily allowance.
 ///
-/// Pure display widget: never writes storage itself. Applying the
-/// calculated budget goes through the page's budget flow (with the
-/// replace-confirmation when the month already has a budget).
+/// This widget only handles the calculations and display. It does not save
+/// anything directly. When the user applies a budget, it uses the page's
+/// existing budget flow, which asks for confirmation if a budget is already set.
 class _DailyBudgetCard extends StatefulWidget {
   const _DailyBudgetCard({
     required this.selectedMonth,
@@ -2143,7 +2144,6 @@ class _SavingsAmountDialogState extends State<_SavingsAmountDialog> {
         ),
       );
     } else {
-      // Remove-flow still expects a plain double.
       Navigator.of(
         context,
       ).pop(_TransferDialogResult(amount: amount, countAsSpending: false));

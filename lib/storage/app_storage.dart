@@ -7,17 +7,49 @@ class AppStorage {
   static const String _tasksKey = 'tasks';
   static const String _sleepKey = 'sleep_records';
   static const String _expensesKey = 'expenses';
-
-  // Multiple savings goals
   static const String _savingsGoalsKey = 'savings_goals';
-
   static const String _budgetKey = 'monthly_budget';
   static const String _scheduleKey = 'schedule';
   static const String _firstDayKey = 'first_day_of_week';
   static const String _sleepGoalKey = 'sleep_goal';
 
+  static const String _monthlyBudgetsKey = 'monthly_budgets';
+  static const String _monthlyBudgetsBackupKey = 'monthly_budgets_backup';
+
   static Future<SharedPreferences> _prefs() async {
     return SharedPreferences.getInstance();
+  }
+
+  // Reads a saved list and converts it back into a list of maps.
+  // Returns an empty list when there is no saved data.
+  static Future<List<Map<String, dynamic>>> _loadList(String key) async {
+    final prefs = await _prefs();
+    final data = prefs.getString(key);
+
+    if (data == null || data.isEmpty) {
+      return [];
+    }
+
+    final decoded = jsonDecode(data);
+
+    if (decoded is! List) {
+      return [];
+    }
+
+    return decoded
+        .map<Map<String, dynamic>>(
+          (item) => Map<String, dynamic>.from(item as Map),
+        )
+        .toList();
+  }
+
+  // Saves a list as JSON in local storage.
+  static Future<void> _saveList(
+    String key,
+    List<Map<String, dynamic>> items,
+  ) async {
+    final prefs = await _prefs();
+    await prefs.setString(key, jsonEncode(items));
   }
 
   // ============================================================
@@ -39,49 +71,25 @@ class AppStorage {
   // ============================================================
 
   static Future<void> saveTasks(List<Map<String, dynamic>> tasks) async {
-    final prefs = await _prefs();
-    await prefs.setString(_tasksKey, jsonEncode(tasks));
+    await _saveList(_tasksKey, tasks);
   }
 
   static Future<List<Map<String, dynamic>>> loadTasks() async {
-    final prefs = await _prefs();
-    final data = prefs.getString(_tasksKey);
-
-    if (data == null || data.isEmpty) {
-      return [];
-    }
-
-    final decoded = jsonDecode(data);
-
-    return List<Map<String, dynamic>>.from(
-      (decoded as List).map((item) => Map<String, dynamic>.from(item)),
-    );
+    return _loadList(_tasksKey);
   }
 
   // ============================================================
-  // SLEEP
+  // SLEEP RECORDS
   // ============================================================
 
   static Future<void> saveSleepRecords(
     List<Map<String, dynamic>> records,
   ) async {
-    final prefs = await _prefs();
-    await prefs.setString(_sleepKey, jsonEncode(records));
+    await _saveList(_sleepKey, records);
   }
 
   static Future<List<Map<String, dynamic>>> loadSleepRecords() async {
-    final prefs = await _prefs();
-    final data = prefs.getString(_sleepKey);
-
-    if (data == null || data.isEmpty) {
-      return [];
-    }
-
-    final decoded = jsonDecode(data);
-
-    return List<Map<String, dynamic>>.from(
-      (decoded as List).map((item) => Map<String, dynamic>.from(item)),
-    );
+    return _loadList(_sleepKey);
   }
 
   // ============================================================
@@ -97,28 +105,17 @@ class AppStorage {
     final prefs = await _prefs();
     return prefs.getInt(_sleepGoalKey) ?? 8;
   }
+
   // ============================================================
   // EXPENSES
   // ============================================================
 
   static Future<void> saveExpenses(List<Map<String, dynamic>> expenses) async {
-    final prefs = await _prefs();
-    await prefs.setString(_expensesKey, jsonEncode(expenses));
+    await _saveList(_expensesKey, expenses);
   }
 
   static Future<List<Map<String, dynamic>>> loadExpenses() async {
-    final prefs = await _prefs();
-    final data = prefs.getString(_expensesKey);
-
-    if (data == null || data.isEmpty) {
-      return [];
-    }
-
-    final decoded = jsonDecode(data);
-
-    return List<Map<String, dynamic>>.from(
-      (decoded as List).map((item) => Map<String, dynamic>.from(item)),
-    );
+    return _loadList(_expensesKey);
   }
 
   // ============================================================
@@ -126,23 +123,11 @@ class AppStorage {
   // ============================================================
 
   static Future<void> saveSavingsGoals(List<Map<String, dynamic>> goals) async {
-    final prefs = await _prefs();
-    await prefs.setString(_savingsGoalsKey, jsonEncode(goals));
+    await _saveList(_savingsGoalsKey, goals);
   }
 
   static Future<List<Map<String, dynamic>>> loadSavingsGoals() async {
-    final prefs = await _prefs();
-    final data = prefs.getString(_savingsGoalsKey);
-
-    if (data == null || data.isEmpty) {
-      return [];
-    }
-
-    final decoded = jsonDecode(data);
-
-    return List<Map<String, dynamic>>.from(
-      (decoded as List).map((item) => Map<String, dynamic>.from(item)),
-    );
+    return _loadList(_savingsGoalsKey);
   }
 
   static Future<void> clearSavingsGoals() async {
@@ -165,63 +150,79 @@ class AppStorage {
   }
 
   // ============================================================
-  // MONTHLY BUDGET (single serialized JSON map)
-  // Stored under 'monthly_budgets' as {"2026-10": 1200.0, ...}
-  // One entry per month; missing month = no budget configured.
-  // Legacy 'monthly_budget' key is left untouched.
+  // MONTHLY BUDGET
   // ============================================================
+
+  // Each month has its own budget.
+  // Example: {"2026-10": 1200.0, "2026-11": 1500.0}
+  //
+  // The old monthly_budget key is kept for existing data.
 
   static Future<void> saveMonthlyBudget(String monthKey, double budget) async {
     final prefs = await _prefs();
-    final current = (await loadMonthlyBudgetMap()) ?? {};
+    final current = await loadMonthlyBudgetMap() ?? {};
+
     current[monthKey] = budget;
-    await prefs.setString('monthly_budgets', jsonEncode(current));
+
+    await prefs.setString(_monthlyBudgetsKey, jsonEncode(current));
   }
 
   static Future<void> deleteMonthlyBudget(String monthKey) async {
     final prefs = await _prefs();
-    final current = (await loadMonthlyBudgetMap()) ?? {};
+    final current = await loadMonthlyBudgetMap() ?? {};
+
     current.remove(monthKey);
+
     if (current.isEmpty) {
-      await prefs.remove('monthly_budgets');
+      await prefs.remove(_monthlyBudgetsKey);
       return;
     }
-    await prefs.setString('monthly_budgets', jsonEncode(current));
+
+    await prefs.setString(_monthlyBudgetsKey, jsonEncode(current));
   }
 
   static Future<double?> loadMonthlyBudget(String monthKey) async {
     final map = await loadMonthlyBudgetMap();
+
     if (map == null) return null;
-    final value = map[monthKey];
-    if (value == null) return null;
-    if (!value.isFinite) return null;
-    return value;
+
+    return map[monthKey];
   }
 
   static Future<Map<String, double>?> loadMonthlyBudgetMap() async {
     final prefs = await _prefs();
-    final raw = prefs.getString('monthly_budgets');
-    if (raw == null || raw.isEmpty) return null;
+    final raw = prefs.getString(_monthlyBudgetsKey);
+
+    if (raw == null || raw.isEmpty) {
+      return null;
+    }
+
     try {
       final decoded = jsonDecode(raw);
-      // If the stored value is not a map at all, leave it alone for a
-      // human to recover (backup key) instead of silently dropping it.
+
+      // Keep a copy of invalid data in case it needs to be recovered.
       if (decoded is! Map<String, dynamic>) {
-        await prefs.setString('monthly_budgets_backup', raw);
+        await prefs.setString(_monthlyBudgetsBackupKey, raw);
         return null;
       }
+
       final map = <String, double>{};
+
       for (final entry in decoded.entries) {
-        // JSON may encode whole numbers without a decimal point,
-        // so accept any numeric value and normalize to double.
         final value = entry.value;
+
         if (value is num) {
-          final v = value.toDouble();
-          if (v.isFinite) map[entry.key] = v;
+          final amount = value.toDouble();
+
+          if (amount.isFinite) {
+            map[entry.key] = amount;
+          }
         }
       }
+
       return map.isEmpty ? null : map;
     } catch (_) {
+      // Return null if the saved JSON cannot be decoded.
       return null;
     }
   }
@@ -231,23 +232,11 @@ class AppStorage {
   // ============================================================
 
   static Future<void> saveSchedule(List<Map<String, dynamic>> schedule) async {
-    final prefs = await _prefs();
-    await prefs.setString(_scheduleKey, jsonEncode(schedule));
+    await _saveList(_scheduleKey, schedule);
   }
 
   static Future<List<Map<String, dynamic>>> loadSchedule() async {
-    final prefs = await _prefs();
-    final data = prefs.getString(_scheduleKey);
-
-    if (data == null || data.isEmpty) {
-      return [];
-    }
-
-    final decoded = jsonDecode(data);
-
-    return List<Map<String, dynamic>>.from(
-      (decoded as List).map((item) => Map<String, dynamic>.from(item)),
-    );
+    return _loadList(_scheduleKey);
   }
 
   // ============================================================
